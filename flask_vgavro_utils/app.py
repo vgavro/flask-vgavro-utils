@@ -1,7 +1,19 @@
+import datetime
+from decimal import Decimal
+
 from flask import Response, jsonify
+from flask.json import JSONEncoder
 
 from .exceptions import ApiError
-from .schemas import dump_with_schemas
+
+
+class ApiJSONEncoder(JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (datetime.datetime, datetime.date)):
+            return obj.isoformat()
+        if isinstance(obj, Decimal):
+            return str(obj)
+        return super().default(obj)
 
 
 def register_api_error_handlers(app, exception=ApiError, wrapper=lambda r: r):
@@ -15,7 +27,7 @@ def register_api_error_handlers(app, exception=ApiError, wrapper=lambda r: r):
         return response
 
 
-def register_api_response(app, schemas_map, wrapper=lambda r: r):
+def register_api_response(app, wrapper=lambda r: r):
     from celery.result import AsyncResult
 
     class ApiResponse(Response):
@@ -24,7 +36,8 @@ def register_api_response(app, schemas_map, wrapper=lambda r: r):
             if isinstance(response, AsyncResult):
                 response = jsonify(wrapper({'task_id': response.id})), 202
             elif isinstance(response, dict):
-                response = jsonify(wrapper(dump_with_schemas(response, schemas_map)))
+                response = jsonify(wrapper(response))
             return super(ApiResponse, cls).force_type(response, environ)
 
     app.response_class = ApiResponse
+    app.json_encoder = ApiJSONEncoder

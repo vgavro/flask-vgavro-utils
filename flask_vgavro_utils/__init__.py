@@ -1,6 +1,7 @@
 from .app import *         # noqa
 from .celery import *      # noqa
 from .cli import *         # noqa
+from .decorators import *  # noqa
 from .exceptions import *  # noqa
 from .schemas import *     # noqa
 from .settings import *    # noqa
