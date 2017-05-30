@@ -1,7 +1,10 @@
 import subprocess
+import logging
+from datetime import datetime
 
 from werkzeug.local import LocalProxy
 from flask import g
+from marshmallow.utils import UTC
 
 
 class classproperty(property):
@@ -25,15 +28,83 @@ def NotImplementedProperty(self):
     raise NotImplementedError()
 
 
+class EntityLoggerAdapter(logging.LoggerAdapter):
+    """
+    Adds info about the entity to the logged messages.
+    """
+    def __init__(self, logger, entity):
+        self.logger = logger
+        self.entity = entity or '?'
+
+    def process(self, msg, kwargs):
+        return '[{}] {}'.format(self.entity, msg), kwargs
+
+
+def _resolve_obj_key(obj, key, supress_exc):
+    if key.isdigit():
+        try:
+            return obj[int(key)]
+        except:
+            try:
+                return obj[key]
+            except Exception as exc:
+                if supress_exc:
+                    return exc
+                raise ValueError('Could not resolve "{}" on {} object: {}'.format(key, obj))
+    else:
+        try:
+            return obj[key]
+        except:
+            try:
+                return getattr(obj, key)
+            except Exception as exc:
+                if supress_exc:
+                    return exc
+                raise ValueError('Could not resolve "{}" on {} object'.format(key, obj))
+
+
+def resolve_obj_path(obj, path, suppress_exc=False):
+    dot_pos = path.find('.')
+    if dot_pos == -1:
+        return _resolve_obj_key(obj, path, suppress_exc)
+    else:
+        key, path = path[:dot_pos], path[(dot_pos + 1):]
+        return resolve_obj_path(_resolve_obj_key(obj, key, suppress_exc),
+                                path, suppress_exc)
+
+
 class AttrDict(dict):
-    """
-    http://stackoverflow.com/a/14620633
-    """
-    def __init__(self, *args, **kwargs):
-        super(AttrDict, self).__init__(*args, **kwargs)
-        self.__dict__ = self
+    __getattr__ = dict.__getitem__
+
+    def __dir__(self):
+        # autocompletion for ipython
+        return super().__dir__() + list(self.keys())
 
 
+def maybe_attr_dict(data):
+    if isinstance(data, dict):
+        return AttrDict({k: maybe_attr_dict(v) for k, v in data.items()})
+    return data
+
+
+def hstore_dict(value):
+    return {k: str(v) for k, v in value.items()}
+
+
+def maybe_encode(string, encoding='utf-8'):
+    return isinstance(string, bytes) and string or str(string).encode(encoding)
+
+
+def maybe_decode(string, encoding='utf-8'):
+    return isinstance(string, str) and string.decode(encoding) or string
+
+
+def datetime_from_utc_timestamp(timestamp):
+    return datetime.utcfromtimestamp(float(timestamp)).replace(tzinfo=UTC)
+
+
+def utcnow():
+    return datetime.now(tz=UTC)
 def is_instance_or_proxied(obj, cls):
     if isinstance(obj, LocalProxy):
         obj = obj._get_current_object()

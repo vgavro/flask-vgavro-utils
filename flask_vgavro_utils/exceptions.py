@@ -12,6 +12,10 @@ class ApiError(Exception):
         super().__init__(message, code, data)
 
 
+class ApiNotFound(ApiError):
+    status_code = 404
+
+
 class EntityError(ApiError):
     status_code = 422
 
