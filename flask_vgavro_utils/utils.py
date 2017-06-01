@@ -23,9 +23,12 @@ class classproperty(property):
         return desc.fget(cls)
 
 
-@property
+@classproperty
 def NotImplementedProperty(self):
     raise NotImplementedError()
+
+
+NotImplementedClassProperty = NotImplementedProperty
 
 
 class EntityLoggerAdapter(logging.LoggerAdapter):
@@ -105,6 +108,8 @@ def datetime_from_utc_timestamp(timestamp):
 
 def utcnow():
     return datetime.now(tz=UTC)
+
+
 def is_instance_or_proxied(obj, cls):
     if isinstance(obj, LocalProxy):
         obj = obj._get_current_object()

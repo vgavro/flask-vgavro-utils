@@ -1,4 +1,26 @@
+import marshmallow as ma
+from marshmallow import fields, validate
+
 from .exceptions import EntityError
+
+
+class SeparatedStr(fields.List):
+    """
+    Used for loading "value1,value2". works like List,
+    so you may pass another field in init (defaults to String).
+    """
+
+    def __init__(self, cls_or_instance=None, separator=',', **kwargs):
+        self.separator = separator
+        super().__init__(cls_or_instance or ma.Str, **kwargs)
+
+    def _serialize(self, value, attr, obj):
+        value = self.separator.join(map(str, value))
+        return super()._deserialize(value, attr, obj)
+
+    def _deserialize(self, value, attr, data):
+        value = tuple(filter(None, value.split(self.separator)))
+        return super()._deserialize(value, attr, data)
 
 
 class SchemaRaiseOnErrorsMixin(object):
@@ -20,12 +42,10 @@ class SchemaRaiseOnErrorsMixin(object):
         EntityError.raise_on_schema_errors(errors)
 
 
-def attach_marshmallow_helpers(ma):
-    import marshmallow
-    import marshmallow.validate
-
-    ma.validate = marshmallow.validate
-    ma.ValidationError = marshmallow.ValidationError
-    for decorator_name in ('pre_dump', 'post_dump', 'pre_load,' 'post_load',
+def attach_marshmallow_helpers(ma_):
+    ma_.SeparatedStr = SeparatedStr
+    ma_.validate = validate
+    ma_.ValidationError = ma.ValidationError
+    for decorator_name in ('pre_dump', 'post_dump', 'pre_load', 'post_load',
                            'validates', 'validates_schema'):
-        setattr(ma, decorator_name, getattr(marshmallow, decorator_name))
+        setattr(ma_, decorator_name, getattr(ma, decorator_name))
