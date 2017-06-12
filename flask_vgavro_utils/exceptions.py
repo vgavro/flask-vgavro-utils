@@ -5,14 +5,15 @@ class ImproperlyConfigured(Exception):
 class ApiError(Exception):
     status_code = 400
 
-    def __init__(self, message, code=None, data={}):
+    def __init__(self, message, code=None, data=None, **kwargs):
         self.message = message
         self.code = code or self.status_code
-        self.data = data
+        self.data = data or {}
+        self.data.update(kwargs)
         super().__init__(message, code, data)
 
 
-class ApiNotFound(ApiError):
+class NotFoundError(ApiError):
     status_code = 404
 
 
