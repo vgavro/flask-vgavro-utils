@@ -20,4 +20,10 @@ setup(
     keywords='',
     packages=find_packages(),
     install_requires=['flask>=0.9'],
+    entry_points={
+        'flask.commands': [
+            'dbreinit=flask_vgavro_utils.cli:dbreinit',
+            'dbshell=flask_vgavro_utils.cli:dbshell',
+        ],
+    },
 )

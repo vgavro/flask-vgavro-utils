@@ -2,6 +2,10 @@ import os
 
 from werkzeug.utils import import_string
 from flask import current_app
+from flask.cli import with_appcontext
+import click
+
+from .tests import register_test_helpers
 
 
 def create_shell_context(*paths):
@@ -21,12 +25,42 @@ def create_shell_context(*paths):
     return {k: v for k, v in result.items() if not k.startswith('__')}
 
 
-def register_shell_context(app, *paths):
+def register_shell_helpers(app, *context_paths, test_helpers=True):
     @app.shell_context_processor
     def shell_context_processor():
-        return create_shell_context(*paths)
+        ctx = {}
+        if test_helpers:
+            register_test_helpers(app)
+            ctx['client'] = app.test_client()
+        ctx.update(create_shell_context(*context_paths))
+        return ctx
 
 
+@click.command()
+@click.option('--verbose', '-v', is_flag=True)
+@with_appcontext
+def dbreinit(verbose):
+    """Reinitialize database (temporary before using alembic migrations)"""
+    from sqlalchemy.schema import DropTable
+    from sqlalchemy.ext.compiler import compiles
+
+    @compiles(DropTable, "postgresql")
+    def _compile_drop_table(element, compiler, **kwargs):
+        return compiler.visit_drop_table(element) + " CASCADE"
+
+    db = current_app.extensions['sqlalchemy'].db
+    if verbose:
+        echo_ = db.engine.echo
+        db.engine.echo = True
+    db.drop_all()
+    db.create_all()
+    db.session.commit()
+    if verbose:
+        db.engine.echo = echo_
+
+
+@click.command()
+@with_appcontext
 def dbshell():
     """Database shell (currently only PostgreSQL supported)."""
 
@@ -40,6 +74,7 @@ def dbshell():
     return os.system(cmd)
 
 
-def register_cli_dbshell(app):
-    # TODO: make it easier and without this function using click directly
-    app.cli.command()(dbshell)
+# Registered in setup.py entry_points
+# def register_cli_commands(app):
+#     app.cli.command()(dbreinit)
+#     app.cli.command()(dbshell)
