@@ -3,6 +3,7 @@ import logging
 from datetime import datetime
 
 from werkzeug.local import LocalProxy
+from werkzeug.utils import import_string
 from flask import g
 from marshmallow.utils import UTC
 
@@ -100,6 +101,10 @@ def maybe_encode(string, encoding='utf-8'):
 
 def maybe_decode(string, encoding='utf-8'):
     return isinstance(string, str) and string.decode(encoding) or string
+
+
+def maybe_import(value):
+    return isinstance(value, str) and import_string(value) or value
 
 
 def datetime_from_utc_timestamp(timestamp):
