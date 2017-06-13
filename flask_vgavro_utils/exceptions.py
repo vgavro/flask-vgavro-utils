@@ -10,7 +10,7 @@ class ApiError(Exception):
         self.code = code or self.status_code
         self.data = data or {}
         self.data.update(kwargs)
-        super().__init__(message, code, data)
+        super().__init__(message, self.code, self.data)
 
 
 class NotFoundError(ApiError):
