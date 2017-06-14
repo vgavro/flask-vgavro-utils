@@ -1,7 +1,8 @@
 import datetime
 from decimal import Decimal
+import traceback
 
-from flask import Response, jsonify
+from flask import Response, jsonify, request
 from flask.json import JSONEncoder
 
 from .exceptions import ApiError
@@ -17,14 +18,34 @@ class ApiJSONEncoder(JSONEncoder):
 
 
 def register_api_error_handlers(app, exception=ApiError, wrapper=lambda r: r):
+    def response(status_code, error):
+        response = jsonify(wrapper({'error': error}))
+        response.status_code = status_code
+        return response
+
     @app.errorhandler(exception)
     def handle_api_error(exc):
         error = exc.data.copy()
         error['message'] = exc.message
         error['code'] = exc.code
-        response = jsonify(wrapper({'error': error}))
-        response.status_code = exc.status_code
-        return response
+        return response(exc.status_code, error)
+
+    @app.errorhandler(404)
+    def handle_api_error(exc):
+        return response(404, {
+            'message': 'URL not found: {}'.format(request.url),
+            'code': 404,
+        })
+
+    @app.errorhandler(Exception)
+    def handle_api_error(exc):
+        return response(500, {
+            'code': 500,
+            'message': str(exc),
+            'repr': repr(exc),
+            'traceback': [tuple(row) for row in traceback.extract_tb(exc.__traceback__)],
+            'stack': [tuple(row) for row in traceback.extract_stack()],
+        })
 
 
 def register_api_response(app, wrapper=lambda r: r):

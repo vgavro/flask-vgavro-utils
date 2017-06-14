@@ -6,6 +6,7 @@ from flask.cli import with_appcontext
 import click
 
 from .tests import register_test_helpers
+from .sqlalchemy import dbreinit as dbreinit_
 
 
 def create_shell_context(*paths):
@@ -41,20 +42,11 @@ def register_shell_helpers(app, *context_paths, test_helpers=True):
 @with_appcontext
 def dbreinit(verbose):
     """Reinitialize database (temporary before using alembic migrations)"""
-    from sqlalchemy.schema import DropTable
-    from sqlalchemy.ext.compiler import compiles
-
-    @compiles(DropTable, "postgresql")
-    def _compile_drop_table(element, compiler, **kwargs):
-        return compiler.visit_drop_table(element) + " CASCADE"
-
     db = current_app.extensions['sqlalchemy'].db
     if verbose:
         echo_ = db.engine.echo
         db.engine.echo = True
-    db.drop_all()
-    db.create_all()
-    db.session.commit()
+    dbreinit_(db)
     if verbose:
         db.engine.echo = echo_
 
