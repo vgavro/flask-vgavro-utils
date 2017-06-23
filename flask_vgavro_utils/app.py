@@ -31,21 +31,28 @@ def register_api_error_handlers(app, exception=ApiError, wrapper=lambda r: r):
         return response(exc.status_code, error)
 
     @app.errorhandler(404)
-    def handle_api_error(exc):
+    def handle_404_error(exc):
         return response(404, {
             'message': 'URL not found: {}'.format(request.url),
             'code': 404,
         })
 
     @app.errorhandler(Exception)
-    def handle_api_error(exc):
-        return response(500, {
+    def handle_internal_error(exc):
+        if app.debug and request.headers.get('X-FLASK-DEBUGGER'):
+            raise  # raising exception to werkzeug debugger
+
+        err = {
             'code': 500,
             'message': str(exc),
             'repr': repr(exc),
-            'traceback': [tuple(row) for row in traceback.extract_tb(exc.__traceback__)],
-            'stack': [tuple(row) for row in traceback.extract_stack()],
-        })
+        }
+        if app.debug:
+            err.update({
+                'traceback': [tuple(row) for row in traceback.extract_tb(exc.__traceback__)],
+                'stack': [tuple(row) for row in traceback.extract_stack()],
+            })
+        return response(500, err)
 
 
 def register_api_response(app, wrapper=lambda r: r):
