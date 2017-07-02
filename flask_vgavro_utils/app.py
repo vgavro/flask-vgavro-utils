@@ -39,7 +39,8 @@ def register_api_error_handlers(app, exception=ApiError, wrapper=lambda r: r):
 
     @app.errorhandler(Exception)
     def handle_internal_error(exc):
-        if app.debug and request.headers.get('X-FLASK-DEBUGGER'):
+        if app.debug and (request.headers.get('X-FLASK-DEBUGGER') or
+                          app.config.get('FLASK_DEBUGGER')):
             raise  # raising exception to werkzeug debugger
 
         err = {
@@ -62,10 +63,11 @@ def register_api_response(app, wrapper=lambda r: r):
         @classmethod
         def force_type(cls, response, environ=None):
             if isinstance(response, AsyncResult):
-                response = jsonify(wrapper({'task_id': response.id})), 202
+                response = jsonify(wrapper({'task_id': response.id}))
+                response.status_code = 202
             elif isinstance(response, dict):
                 response = jsonify(wrapper(response))
-            return super(ApiResponse, cls).force_type(response, environ)
+            return super().force_type(response, environ)
 
     app.response_class = ApiResponse
     app.json_encoder = ApiJSONEncoder
