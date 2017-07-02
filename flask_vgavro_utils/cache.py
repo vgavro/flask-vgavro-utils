@@ -7,7 +7,7 @@ from flask import current_app
 import redis
 
 
-def register_app_cache(app):
+def create_cache(app):
     cache = RedisSerializedCache(app.config['REDIS_URL'])
     func_cache = RedisSerializedCache(app.config['REDIS_URL'], 'FUNC_CACHE')
     app.extensions['cache'] = cache

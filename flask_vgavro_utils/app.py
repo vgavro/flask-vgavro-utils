@@ -57,11 +57,14 @@ def register_api_error_handlers(app, exception=ApiError, wrapper=lambda r: r):
 
 
 def register_api_response(app, wrapper=lambda r: r):
-    from celery.result import AsyncResult
+    from celery.result import EagerResult, AsyncResult
 
     class ApiResponse(Response):
         @classmethod
         def force_type(cls, response, environ=None):
+            if isinstance(response, EagerResult):
+                response.maybe_throw()
+                response = response.result
             if isinstance(response, AsyncResult):
                 response = jsonify(wrapper({'task_id': response.id}))
                 response.status_code = 202

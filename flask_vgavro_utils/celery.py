@@ -1,7 +1,4 @@
-from .exceptions import ApiError
-
-
-def create_celery_app(app):
+def create_celery(app):
     from celery import Celery
 
     celery = Celery(app.import_name, backend=app.config['CELERY_RESULT_BACKEND'],
@@ -18,11 +15,13 @@ def create_celery_app(app):
                 return TaskBase.__call__(self, *args, **kwargs)
 
     celery.Task = ContextTask
+
+    app.extensions['celery'] = celery
     return celery
 
 
-def register_task_result_route(app, celery, rule='/task/<int:id>/'):
-    from celery.result import AsyncResult
+def register_task_views(app, celery, prefix=''):
+    rule = prefix + '/task/<task_id>'
 
     @app.route(rule, methods=['GET'])
     def get_task(task_id):
@@ -30,7 +29,6 @@ def register_task_result_route(app, celery, rule='/task/<int:id>/'):
         if task.ready():
             return task.get()  # raises Exception if error was occured
         return task  # should be processed Response.force_type for 202
-
 
     @app.route(rule, methods=['DELETE'])
     def delete_task(task_id):
