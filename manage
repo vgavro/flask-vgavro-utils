@@ -51,7 +51,7 @@ if [[ ($# = 0) || ($1 = "help") || ($1 = "--help") || ($1 = "-h") ]]; then
 
 elif [[ $1 = "dev" ]]; then
   export FLASK_DEBUG=1
-  export WERKZEUG_DEBUG_PIN=0
+  export WERKZEUG_DEBUG_PIN=off
   $ROOT/$ENV/bin/flask run "${@:2}"
 
 elif [[ $1 = "install" ]]; then

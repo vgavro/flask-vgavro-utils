@@ -1,13 +1,11 @@
 import marshmallow as ma
 from marshmallow import fields, validate
 
-from .exceptions import EntityError
-
 
 class SeparatedStr(fields.List):
     """
-    Used for loading "value1,value2". works like List,
-    so you may pass another field in init (defaults to String).
+    Used for loading "value1,value2" strings. Works like marshmallow.fields.List,
+    so you may pass another field in init (defaults to marshmallow.fields.String).
     """
 
     def __init__(self, cls_or_instance=None, separator=',', **kwargs):
@@ -23,27 +21,41 @@ class SeparatedStr(fields.List):
         return super()._deserialize(value, attr, data)
 
 
-class SchemaRaiseOnErrorsMixin(object):
-    def load(self, *args, **kwargs):
-        raise_on_errors = kwargs.pop('raise_on_errors', True)
-        data, errors = super().load(*args, **kwargs)
-        if raise_on_errors:
-            self.raise_on_load_errors(errors)
-        return data, errors
+class NestedLazy(fields.Nested):
+    """
+    Nested schema with difference, that it's not cached on field and initialized
+    only on load/dump or direct access to field.schema.
+    Usage: some_field = NestedLazy(lambda field: schema_cls_or_instance)
+    """
+    @property
+    def schema(self):
+        context = getattr(self.parent, 'context', {})
+        schema = self.nested(self)
+        if isinstance(schema, ma.Schema):
+            schema.context.update(context)
+            return schema
+        elif issubclass(schema, ma.Schema):
+            return schema(many=self.many, only=self.only, exclude=self.exclude,
+                          context=context,
+                          load_only=self._nested_normalized_option('load_only'),
+                          dump_only=self._nested_normalized_option('dump_only'))
+        raise ValueError('NestedLazy function resulted to unknown schema type: {}',
+                         repr(schema))
 
-    def dump(self, *args, **kwargs):
-        raise_on_errors = kwargs.pop('raise_on_errors', True)
-        data, errors = super().dump(*args, **kwargs)
-        if raise_on_errors:
-            assert (not errors), errors  # TODO: raise 500 with description
-        return data, errors
 
-    def raise_on_load_errors(self, errors):
-        EntityError.raise_on_schema_errors(errors)
+class StrictSchemaMixin:
+    """
+    As there is no schema.Meta inheritance, defaults to strict=True on initialization.
+    """
+    def __init__(self, *args, **kwargs):
+        if 'strict' not in kwargs and not hasattr(self.Meta, 'strict'):
+            kwargs.update({'strict': True})
+        super().__init__(*args, **kwargs)
 
 
 def attach_marshmallow_helpers(ma_):
     ma_.SeparatedStr = SeparatedStr
+    ma_.NestedLazy = NestedLazy
     ma_.validate = validate
     ma_.ValidationError = ma.ValidationError
     for decorator_name in ('pre_dump', 'post_dump', 'pre_load', 'post_load',
