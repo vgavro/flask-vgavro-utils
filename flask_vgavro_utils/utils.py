@@ -44,7 +44,7 @@ class EntityLoggerAdapter(logging.LoggerAdapter):
         return '[{}] {}'.format(self.entity, msg), kwargs
 
 
-def _resolve_obj_key(obj, key, supress_exc):
+def _resolve_obj_key(obj, key):
     if key.isdigit():
         try:
             return obj[int(key)]
@@ -52,9 +52,8 @@ def _resolve_obj_key(obj, key, supress_exc):
             try:
                 return obj[key]
             except Exception as exc:
-                if supress_exc:
-                    return exc
-                raise ValueError('Could not resolve "{}" on {} object: {}'.format(key, obj))
+                raise ValueError('Could not resolve "{}" on {} object: {!r}'
+                                 .format(key, obj, exc))
     else:
         try:
             return obj[key]
@@ -62,19 +61,22 @@ def _resolve_obj_key(obj, key, supress_exc):
             try:
                 return getattr(obj, key)
             except Exception as exc:
-                if supress_exc:
-                    return exc
-                raise ValueError('Could not resolve "{}" on {} object'.format(key, obj))
+                raise ValueError('Could not resolve "{}" on {} object: {!r}'
+                                 .format(key, obj, exc))
 
 
-def resolve_obj_path(obj, path, suppress_exc=False):
-    dot_pos = path.find('.')
-    if dot_pos == -1:
-        return _resolve_obj_key(obj, path, suppress_exc)
-    else:
-        key, path = path[:dot_pos], path[(dot_pos + 1):]
-        return resolve_obj_path(_resolve_obj_key(obj, key, suppress_exc),
-                                path, suppress_exc)
+def resolve_obj_path(obj, path, supress_exc=False):
+    try:
+        dot_pos = path.find('.')
+        if dot_pos == -1:
+            return _resolve_obj_key(obj, path)
+        else:
+            key, path = path[:dot_pos], path[(dot_pos + 1):]
+            return resolve_obj_path(_resolve_obj_key(obj, key), path)
+    except Exception as exc:
+        if supress_exc:
+            return exc
+        raise
 
 
 class AttrDict(dict):
