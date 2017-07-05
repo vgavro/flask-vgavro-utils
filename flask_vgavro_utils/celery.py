@@ -20,8 +20,8 @@ def create_celery(app):
     return celery
 
 
-def register_task_views(app, celery, prefix=''):
-    rule = prefix + '/task/<task_id>'
+def register_task_views(app, rule='/task/<task_id>'):
+    celery = app.extensions['celery']
 
     @app.route(rule, methods=['GET'])
     def get_task(task_id):
