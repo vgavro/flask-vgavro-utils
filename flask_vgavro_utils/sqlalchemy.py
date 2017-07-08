@@ -1,10 +1,10 @@
 from .utils import ReprMixin
 
 
-class SAModelMixin(ReprMixin):
-    def to_dict(self, exclude=[]):
-        fields = [c.name for c in self.__table__.columns]
-        return dict((f, getattr(self, f)) for f in fields if f not in exclude)
+class ModelReprMixin(ReprMixin):
+    def to_dict(self, *args, exclude=[]):
+        fields = args or [c.name for c in self.__table__.columns]
+        return super().to_dict(fields, exclude=exclude)
 
 
 def dbreinit(db):

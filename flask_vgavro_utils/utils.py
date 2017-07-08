@@ -153,7 +153,11 @@ def get_git_repository_info(path='./'):
 
 class ReprMixin:
     def __repr__(self):
-        dict_ = hasattr(self, 'to_dict') and self.to_dict() or self.__dict__
-        items = dict_.items()
-        items_str = ', '.join((u'{}={}'.format(k, v) for k, v in items))
-        return '<{}({})>'.format(self.__class__.__name__, items_str)
+        attrs = ', '.join((u'{}={}'.format(k, v)
+                          for k, v in self.to_dict().items()))
+        return '<{}({})>'.format(self.__class__.__name__, attrs)
+
+    def to_dict(self, *args, exclude=[]):
+        args = args or self.__dict__.keys()
+        return {key: self.__dict__[key] for key in args
+                if not key.startswith('_') and key not in exclude}
