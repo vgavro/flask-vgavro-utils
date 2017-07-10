@@ -96,10 +96,12 @@ def register_flask_debugger_view(app, rule='/flask_debugger'):
         data = request.args.get('data')
 
         headers = {}
-        for key in [k for k in request.args if k.startswith('header_')]:
-            headers[key[7:]] = request.args[key]
+        if 'User-Agent' in request.headers:
+            headers['User-Agent'] = request.headers['User-Agent']
         if 'Cookie' in request.headers:
             headers['Cookie'] = request.headers['Cookie']
+        if data:
+            headers['Content-Type'] = 'application/json; charset=UTF-8'
         headers['X-Flask-Debugger'] = True
 
         result = app.test_client().open(url, method=method, data=data, headers=headers)
