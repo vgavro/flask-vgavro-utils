@@ -23,24 +23,24 @@ class SeparatedStr(fields.List):
 
 class NestedLazy(fields.Nested):
     """
-    Nested schema with difference, that it's not cached on field and initialized
-    only on load/dump or direct access to field.schema.
+    Nested schema with difference, that it may not be cached on field and
+    initialized from callback.
     Usage: some_field = NestedLazy(lambda field: schema_cls_or_instance)
     """
+    def __init__(self, nested_callable, *args, **kwargs):
+        self.nested_cache = kwargs.pop('cache', False)
+        self.nested_callable = nested_callable
+        super().__init__(None, *args, **kwargs)
+
     @property
     def schema(self):
-        context = getattr(self.parent, 'context', {})
-        schema = self.nested(self)
-        if isinstance(schema, ma.Schema):
-            schema.context.update(context)
-            return schema
-        elif issubclass(schema, ma.Schema):
-            return schema(many=self.many, only=self.only, exclude=self.exclude,
-                          context=context,
-                          load_only=self._nested_normalized_option('load_only'),
-                          dump_only=self._nested_normalized_option('dump_only'))
-        raise ValueError('NestedLazy function resulted to unknown schema type: {}',
-                         repr(schema))
+        if hasattr(self, '_Nested__schema'):
+            if self.nested_cache:
+                return self._Nested__schema
+            else:
+                self._Nested__schema = None
+        self.nested = self.nested_callable(self)
+        return super().schema
 
 
 class StrictSchemaMixin:

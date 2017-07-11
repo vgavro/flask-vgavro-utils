@@ -9,7 +9,7 @@ from .schemas import StrictSchemaMixin
 DEFAULT_BASE_SCHEMA = type('StrictSchema', (StrictSchemaMixin, Schema), {})
 
 
-def create_schema(schema_or_dict, extends=None):
+def create_schema(schema_or_dict, extends=None, **kwargs):
     if extends:
         if not any(map(lambda s: issubclass(s, Schema), extends)):
             extends = tuple(extends) + (Schema,)
@@ -17,9 +17,9 @@ def create_schema(schema_or_dict, extends=None):
         extends = (DEFAULT_BASE_SCHEMA,)
 
     if isinstance(schema_or_dict, type):
-        return schema_or_dict()
+        return schema_or_dict(**kwargs)
     elif isinstance(schema_or_dict, dict):
-        return type('_Schema', extends, schema_or_dict)()
+        return type('_Schema', extends, schema_or_dict)(**kwargs)
     else:
         assert isinstance(schema_or_dict, Schema)
         return schema_or_dict
