@@ -4,7 +4,7 @@ from .utils import ReprMixin
 class ModelReprMixin(ReprMixin):
     def to_dict(self, *args, exclude=[]):
         fields = args or [c.name for c in self.__table__.columns]
-        return super().to_dict(fields, exclude=exclude)
+        return super().to_dict(*fields, exclude=exclude)
 
 
 def dbreinit(db):

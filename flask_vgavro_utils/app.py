@@ -1,5 +1,6 @@
 import datetime
-from decimal import Decimal
+import decimal
+import enum
 import traceback
 
 from flask import Response, jsonify, request
@@ -13,8 +14,10 @@ class ApiJSONEncoder(JSONEncoder):
     def default(self, obj):
         if isinstance(obj, (datetime.datetime, datetime.date)):
             return obj.isoformat()
-        if isinstance(obj, Decimal):
+        if isinstance(obj, decimal.Decimal):
             return str(obj)
+        if isinstance(obj, enum.Enum):
+            return enum.name
         return super().default(obj)
 
 
