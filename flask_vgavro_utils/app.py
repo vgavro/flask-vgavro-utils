@@ -17,7 +17,7 @@ class ApiJSONEncoder(JSONEncoder):
         if isinstance(obj, decimal.Decimal):
             return str(obj)
         if isinstance(obj, enum.Enum):
-            return enum.name
+            return obj.name
         return super().default(obj)
 
 

@@ -159,5 +159,5 @@ class ReprMixin:
 
     def to_dict(self, *args, exclude=[]):
         args = args or self.__dict__.keys()
-        return {key: self.__dict__[key] for key in args
+        return {key: getattr(self, key) for key in args
                 if not key.startswith('_') and key not in exclude}
