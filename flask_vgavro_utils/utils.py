@@ -151,9 +151,16 @@ def get_git_repository_info(path='./'):
     return info[path]
 
 
+def string_repr_short(value, length=64):
+    value = str(value)
+    if len(value) > length:
+        return value[:length - 3] + '...'
+    return value
+
+
 class ReprMixin:
     def __repr__(self):
-        attrs = ', '.join((u'{}={}'.format(k, v)
+        attrs = ', '.join((u'{}={}'.format(k, string_repr_short(v))
                           for k, v in self.to_dict().items()))
         return '<{}({})>'.format(self.__class__.__name__, attrs)
 
