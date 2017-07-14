@@ -29,14 +29,21 @@ class EntityError(ApiError):
     @classmethod
     def from_schema_errors(cls, errors):
         if errors:
-            schema_errors = errors.pop('_schema', None)
-            if schema_errors:
-                errors[''] = schema_errors
-                message = schema_errors[0]
-            else:
-                message = tuple(errors.values())[0][0]
+            message = cls._get_first_error(errors)
             return cls(message, data={'errors': errors})
 
     @classmethod
     def from_validation_error(cls, exc):
         return cls.from_schema_errors(exc.normalized_messages())
+
+    @classmethod
+    def _get_first_error(cls, errors):
+        if '_schema' in errors:
+            return errors['_schema'][0]
+        field_errors = tuple(errors.values())[0]
+        if isinstance(field_errors, (tuple, list)):
+            return field_errors[0]
+        elif isinstance(field_errors, dict):
+            # nested schema error
+            return cls._get_first_error(field_errors)
+        raise ValueError('Unknown field error type: {}'.format(field_errors))
