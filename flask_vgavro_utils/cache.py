@@ -40,6 +40,9 @@ class RedisCache:
     def delete(self, *keys):
         map(self._redis.delete, map(self._build_key, keys))
 
+    def flush(self):
+        self._redis.flushdb()
+
 
 class RedisSerializedCache(RedisCache):
     def _serialize(self, value):
