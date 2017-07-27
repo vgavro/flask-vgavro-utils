@@ -1,5 +1,6 @@
 import subprocess
 import logging
+import time
 from datetime import datetime
 
 from werkzeug.local import LocalProxy
@@ -168,3 +169,29 @@ class ReprMixin:
         args = args or self.__dict__.keys()
         return {key: getattr(self, key) for key in args
                 if not key.startswith('_') and key not in exclude}
+
+
+def _create_gevent_switch_time_tracer(max_blocking_time, logger):
+    import gevent.hub
+
+    def _gevent_switch_time_tracer(what, origin_target):
+        origin, target = origin_target
+        if not hasattr(_gevent_switch_time_tracer, '_last_switch_time'):
+            _gevent_switch_time_tracer._last_switch_time = None
+        then = _gevent_switch_time_tracer._last_switch_time
+        now = _gevent_switch_time_tracer._last_switch_time = time.time()
+        if then is not None:
+            blocking_time = now - then
+            if origin is not gevent.hub.get_hub():
+                if blocking_time > max_blocking_time:
+                    msg = "Greenlet blocked the eventloop for %.4f seconds\n"
+                    logger.warning(msg, blocking_time)
+
+    return _gevent_switch_time_tracer
+
+
+def set_gevent_switch_time_tracer(max_blocking_time, logger):
+    # based on http://www.rfk.id.au/blog/entry/detect-gevent-blocking-with-greenlet-settrace/
+    import greenlet
+
+    greenlet.settrace(_create_gevent_switch_time_tracer(max_blocking_time, logger))
