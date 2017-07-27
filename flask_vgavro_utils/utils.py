@@ -1,12 +1,13 @@
 import subprocess
 import logging
 import time
-from datetime import datetime
+import contextlib
+from functools import wraps
+from datetime import datetime, timezone
 
 from werkzeug.local import LocalProxy
 from werkzeug.utils import import_string
 from flask import g
-from marshmallow.utils import UTC
 
 
 class classproperty(property):
@@ -111,11 +112,11 @@ def maybe_import(value):
 
 
 def datetime_from_utc_timestamp(timestamp):
-    return datetime.utcfromtimestamp(float(timestamp)).replace(tzinfo=UTC)
+    return datetime.utcfromtimestamp(float(timestamp)).replace(tzinfo=timezone.utc)
 
 
 def utcnow():
-    return datetime.now(tz=UTC)
+    return datetime.now(tz=timezone.utc)
 
 
 def is_instance_or_proxied(obj, cls):
@@ -124,13 +125,18 @@ def is_instance_or_proxied(obj, cls):
     return isinstance(obj, cls)
 
 
-def local_proxy_on_g(attr, callback):
-    def wrapper():
-        if g:
-            if not hasattr(g, attr):
-                setattr(g, attr, callback())
-            return getattr(g, attr)
-    return LocalProxy(wrapper)
+def local_proxy_on_g(attr_name=None):
+    def decorator(func):
+        attr = attr_name or func.__name__
+
+        def wrapper():
+            if g:
+                if not hasattr(g, attr):
+                    setattr(g, attr, func())
+                return getattr(g, attr)
+        return LocalProxy(wrapper)
+
+    return decorator
 
 
 def get_git_repository_info(path='./'):
@@ -169,6 +175,22 @@ class ReprMixin:
         args = args or self.__dict__.keys()
         return {key: getattr(self, key) for key in args
                 if not key.startswith('_') and key not in exclude}
+
+
+class db_transaction(contextlib.ContextDecorator):
+    def __init__(self, db, commit=True, rollback=False):
+        assert not (commit and rollback)
+        self.db, self.commit, self.rollback = db, commit, rollback
+
+    def __enter__(self):
+        self.db.session.flush()
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        if not exc_type and self.commit:
+            self.db.session.commit()
+        elif exc_type or self.rollback:
+            self.db.session.rollback()
+        self.db.session.close()
 
 
 def _create_gevent_switch_time_tracer(max_blocking_time, logger):

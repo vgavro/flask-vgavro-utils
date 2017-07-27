@@ -29,3 +29,12 @@ def update_context_from_import(context, module, warn_on_not_found=False):
             raise
 
     context.update({k: v for k, v in module_context.items() if not k.startswith('__')})
+
+
+def update_context_on_environ(context, environ_key, prefix):
+    import os
+
+    if os.environ.get(environ_key):
+        for key, value in list(context.items()):
+            if key.startswith(prefix):
+                context[key[len(prefix):]] = value
