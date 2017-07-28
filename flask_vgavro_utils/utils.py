@@ -2,8 +2,8 @@ import subprocess
 import logging
 import time
 import contextlib
-from functools import wraps
-from datetime import datetime, timezone
+from datetime import datetime, date, timezone
+import json
 
 from werkzeug.local import LocalProxy
 from werkzeug.utils import import_string
@@ -175,6 +175,29 @@ class ReprMixin:
         args = args or self.__dict__.keys()
         return {key: getattr(self, key) for key in args
                 if not key.startswith('_') and key not in exclude}
+
+
+def pprint(obj, indent=2, colors=True):
+    def default(obj):
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
+        if isinstance(obj, ReprMixin):
+            return obj.to_dict()
+        raise TypeError('Type %s not serializable' % type(obj))
+
+    rv = json.dumps(obj, default=default, indent=indent, ensure_ascii=False)
+
+    if colors:
+        try:
+            from pygments import highlight
+            from pygments.lexers import JsonLexer
+            from pygments.formatters import TerminalFormatter
+        except ImportError:
+            pass
+        else:
+            rv = highlight(rv, JsonLexer(), TerminalFormatter())
+
+    print(rv)
 
 
 class db_transaction(contextlib.ContextDecorator):
