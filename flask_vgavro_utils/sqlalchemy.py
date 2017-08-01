@@ -16,6 +16,7 @@ def dbreinit(db):
     def _compile_drop_table(element, compiler, **kwargs):
         return compiler.visit_drop_table(element) + " CASCADE"
 
-    db.drop_all()
-    db.create_all()
+    # NOTE: bind=None to drop_all and create_all only default database
+    db.drop_all(bind=None)
+    db.create_all(bind=None)
     db.session.commit()
