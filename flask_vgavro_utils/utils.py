@@ -204,7 +204,6 @@ class db_transaction(contextlib.ContextDecorator):
     def __init__(self, db, commit=True, rollback=False):
         assert not (commit and rollback)
         self.db, self.commit, self.rollback = db, commit, rollback
-        print('flush before new session')
         db.session.flush()
 
     def __enter__(self):
