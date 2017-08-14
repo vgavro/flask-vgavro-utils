@@ -204,15 +204,21 @@ class db_transaction(contextlib.ContextDecorator):
     def __init__(self, db, commit=True, rollback=False):
         assert not (commit and rollback)
         self.db, self.commit, self.rollback = db, commit, rollback
+        db.session.flush()
 
     def __enter__(self):
-        self.db.session.flush()
+        pass
 
     def __exit__(self, exc_type, exc_value, exc_tb):
         if not exc_type and self.commit:
-            self.db.session.commit()
+            try:
+                self.db.session.commit()
+            except:
+                self.db.session.close()
+                raise
         elif exc_type or self.rollback:
             self.db.session.rollback()
+
         self.db.session.close()
 
 
