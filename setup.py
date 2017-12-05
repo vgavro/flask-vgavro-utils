@@ -20,6 +20,7 @@ setup(
     keywords='',
     packages=find_packages(),
     install_requires=['flask>=0.9'],
+    scripts=['./manage'],
     entry_points={
         'flask.commands': [
             'dbreinit=flask_vgavro_utils.cli:dbreinit',

@@ -62,7 +62,10 @@ def register_api_error_handlers(app, exception=ApiError, wrapper=lambda r: r):
 
 
 def register_api_response(app, wrapper=lambda r: r):
-    from celery.result import EagerResult, AsyncResult
+    try:
+        from celery.result import EagerResult, AsyncResult
+    except ImportError:
+        EagerResult, AsyncResult = (), ()  # for isinstance False
 
     class ApiResponse(Response):
         @classmethod

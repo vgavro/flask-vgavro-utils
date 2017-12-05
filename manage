@@ -73,5 +73,5 @@ elif [[ $1 = "webapp" ]]; then
   (cd $ROOT/$WEBAPP && npm --silent run "${@:2}")
 
 else
-  ./env/bin/flask $*
+  $ROOT/env/bin/flask $*
 fi
