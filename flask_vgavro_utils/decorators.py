@@ -3,18 +3,14 @@ from functools import wraps
 from marshmallow import Schema
 from flask import request
 
-from .schemas import StrictSchemaMixin
-
-
-DEFAULT_BASE_SCHEMA = type('StrictSchema', (StrictSchemaMixin, Schema), {})
-
 
 def create_schema(schema_or_dict, extends=None, **kwargs):
     if extends:
         if not any(map(lambda s: issubclass(s, Schema), extends)):
             extends = tuple(extends) + (Schema,)
     else:
-        extends = (DEFAULT_BASE_SCHEMA,)
+        extends = (Schema,)
+    kwargs.setdefault('strict', True)
 
     if isinstance(schema_or_dict, type):
         return schema_or_dict(**kwargs)
@@ -23,6 +19,7 @@ def create_schema(schema_or_dict, extends=None, **kwargs):
         return type('_Schema', extends, schema_or_dict.copy())(**kwargs)
     else:
         assert isinstance(schema_or_dict, Schema)
+        assert schema_or_dict.strict, 'TypeError on silently passing errors'
         return schema_or_dict
 
 

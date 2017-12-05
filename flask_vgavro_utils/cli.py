@@ -39,9 +39,12 @@ def register_shell_helpers(app, *context_paths, test_helpers=True):
 
 @click.command()
 @click.option('--verbose', '-v', is_flag=True)
+@click.option('--no-confirm', is_flag=True)
 @with_appcontext
-def dbreinit(verbose):
+def dbreinit(verbose, no_confirm):
     """Reinitialize database (temporary before using alembic migrations)"""
+    if not no_confirm:
+        click.confirm('This will drop ALL DATA. Do you want to continue?', abort=True)
     db = current_app.extensions['sqlalchemy'].db
     if verbose:
         echo_ = db.engine.echo
