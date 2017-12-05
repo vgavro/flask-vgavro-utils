@@ -18,6 +18,8 @@ class ApiJSONEncoder(JSONEncoder):
             return str(obj)
         if isinstance(obj, enum.Enum):
             return obj.name
+        if hasattr(obj, 'to_dict'):
+            return obj.to_dict()
         return super().default(obj)
 
 
