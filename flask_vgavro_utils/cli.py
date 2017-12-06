@@ -6,7 +6,7 @@ from flask.cli import with_appcontext
 import click
 
 from .tests import register_test_helpers
-from .sqlalchemy import dbreinit as dbreinit_
+from .sqlalchemy import db_reinit
 
 
 def create_shell_context(*paths):
@@ -40,8 +40,9 @@ def register_shell_helpers(app, *context_paths, test_helpers=True):
 @click.command()
 @click.option('--verbose', '-v', is_flag=True)
 @click.option('--no-confirm', is_flag=True)
+@click.option('--bind', '-b', default=None)
 @with_appcontext
-def dbreinit(verbose, no_confirm):
+def dbreinit(verbose, no_confirm, bind=None):
     """Reinitialize database (temporary before using alembic migrations)"""
     if not no_confirm:
         click.confirm('This will drop ALL DATA. Do you want to continue?', abort=True)
@@ -49,7 +50,7 @@ def dbreinit(verbose, no_confirm):
     if verbose:
         echo_ = db.engine.echo
         db.engine.echo = True
-    dbreinit_(db)
+    db_reinit(db, bind)
     if verbose:
         db.engine.echo = echo_
 

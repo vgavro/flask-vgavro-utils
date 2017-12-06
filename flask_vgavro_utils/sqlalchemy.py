@@ -15,19 +15,20 @@ class SQLAlchemy(SQLAlchemy):
     def apply_driver_hacks(self, app, info, options):
         super().apply_driver_hacks(app, info, options)
         if (app and 'SQLALCHEMY_STATEMENT_TIMEOUT' in app.config and
-           info.drivername == 'postgresql'):
+           info.drivername in ('postgresql', 'postgresql+psycopg2')):
             timeout = int(app.config['SQLALCHEMY_STATEMENT_TIMEOUT']) * 1000
             assert 'connect_args' not in options
             options['connect_args'] = {'options': '-c statement_timeout={:d}'.format(timeout)}
 
 
 class ModelReprMixin(ReprMixin):
+    # See for all fields https://stackoverflow.com/a/2448930/450103
     def to_dict(self, *args, exclude=[]):
         fields = args or [c.name for c in self.__table__.columns]
         return super().to_dict(*fields, exclude=exclude)
 
 
-def dbreinit(db):
+def db_reinit(db, bind=None):
     """Reinitialize database"""
     from sqlalchemy.schema import DropTable
     from sqlalchemy.ext.compiler import compiles
@@ -37,6 +38,6 @@ def dbreinit(db):
         return compiler.visit_drop_table(element) + " CASCADE"
 
     # NOTE: bind=None to drop_all and create_all only default database
-    db.drop_all(bind=None)
-    db.create_all(bind=None)
+    db.drop_all(bind=bind)
+    db.create_all(bind=bind)
     db.session.commit()

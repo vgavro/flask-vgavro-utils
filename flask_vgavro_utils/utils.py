@@ -50,7 +50,7 @@ def _resolve_obj_key(obj, key):
     if key.isdigit():
         try:
             return obj[int(key)]
-        except:
+        except Exception:
             try:
                 return obj[key]
             except Exception as exc:
@@ -59,7 +59,7 @@ def _resolve_obj_key(obj, key):
     else:
         try:
             return obj[key]
-        except:
+        except Exception:
             try:
                 return getattr(obj, key)
             except Exception as exc:
@@ -150,7 +150,7 @@ def get_git_repository_info(path='./'):
                                     stdout=subprocess.PIPE, cwd=path)
             out, err = pipe.communicate()
             info[path] = dict(zip(('rev', 'email', 'time'), out.split('|')))
-        except:
+        except Exception:
             # do not retry on first fail
             info[path] = {}
             # raise
@@ -166,9 +166,9 @@ def string_repr_short(value, length=64):
 
 
 class ReprMixin:
-    def __repr__(self, dict_=None):
+    def __repr__(self, *args, exclude=[]):
         attrs = ', '.join((u'{}={}'.format(k, string_repr_short(v))
-                          for k, v in (dict_ or self.to_dict()).items()))
+                          for k, v in self.to_dict(*args, exclude=exclude).items()))
         return '<{}({})>'.format(self.__class__.__name__, attrs)
 
     def to_dict(self, *args, exclude=[]):
@@ -213,7 +213,7 @@ class db_transaction(contextlib.ContextDecorator):
         if not exc_type and self.commit:
             try:
                 self.db.session.commit()
-            except:
+            except BaseException:
                 self.db.session.close()
                 raise
         elif exc_type or self.rollback:
