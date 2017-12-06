@@ -16,13 +16,16 @@ def create_cache(app):
 
 
 class RedisCache:
-    def __init__(self, redis_url='redis://localhost:6379/0', base_cache_key=None):
-        self.base_cache_key = base_cache_key
-        if not hasattr(RedisCache, '_redis'):
-            RedisCache._redis = redis.StrictRedis.from_url(redis_url)
+    _redis_map = {}
+
+    def __init__(self, redis_url='redis://localhost:6379/0', base_key=None):
+        self.base_key = base_key
+        if redis_url not in self._redis_map:
+            self._redis_map[redis_url] = redis.StrictRedis.from_url(redis_url)
+        self._redis = self._redis_map[redis_url]
 
     def _build_key(self, key):
-        return self.base_cache_key and '{}:{}'.format(self.base_cache_key, key) or key
+        return self.base_key and '{}:{}'.format(self.base_key, key) or key
 
     def get(self, key, default=None):
         result = self._redis.get(self._build_key(key))

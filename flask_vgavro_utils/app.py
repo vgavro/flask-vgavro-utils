@@ -46,8 +46,8 @@ def register_api_error_handlers(app, exception=ApiError, wrapper=lambda r: r):
 
     @app.errorhandler(Exception)
     def handle_internal_error(exc):
-        if app.debug and (app.testing or request.headers.get('X-FLASK-DEBUGGER') or
-                          app.config.get('FLASK_DEBUGGER')):
+        if app.debug and (app.testing or request.headers.get('X-DEBUGGER') or
+                          app.config.get('FLASK_DEBUGGER_ALWAYS_ON_ERROR')):
             raise  # raising exception to werkzeug debugger
 
         err = {
@@ -84,33 +84,3 @@ def register_api_response(app, wrapper=lambda r: r):
 
     app.response_class = ApiResponse
     app.json_encoder = ApiJSONEncoder
-
-
-def register_flask_debugger_view(app, rule='/flask_debugger'):
-    """
-    As debugger is not very useful for ajax requests (especially for POST requests,
-    which is impossible to retry in Chrome), we should have different endpoint,
-    so frontend could open same request in debugger for some cases.
-    Also we always return 500 exception as json. See register_api_error_handlers.
-    """
-
-    @app.route(rule)
-    def flask_debugger():
-        if not app.debug:
-            return 'Forbidden', 403
-
-        method = request.args.get('method').upper()
-        url = request.args.get('url')
-        data = request.args.get('data')
-
-        headers = {}
-        if 'User-Agent' in request.headers:
-            headers['User-Agent'] = request.headers['User-Agent']
-        if 'Cookie' in request.headers:
-            headers['Cookie'] = request.headers['Cookie']
-        if data:
-            headers['Content-Type'] = 'application/json; charset=UTF-8'
-        headers['X-Flask-Debugger'] = True
-
-        result = app.test_client().open(url, method=method, data=data, headers=headers)
-        return result
