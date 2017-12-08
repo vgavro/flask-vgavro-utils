@@ -23,6 +23,15 @@ class NotFoundError(ApiError):
     status_code = 404
 
 
+def _convert_int_keys_to_str(dict_):
+    for k, v in dict_.items():
+        if isinstance(k, int):
+            dict_[str(k)] = v
+            del dict_[k]
+        if isinstance(v, dict):
+            _convert_int_keys_to_str(v)
+
+
 class EntityError(ApiError):
     status_code = 422
 
@@ -30,6 +39,8 @@ class EntityError(ApiError):
     def from_schema_errors(cls, errors):
         if errors:
             message = cls._get_first_error(errors)
+            # To sort keys on json dump (default flask behaviour)
+            _convert_int_keys_to_str(errors)
             return cls(message, data={'errors': errors})
 
     @classmethod
