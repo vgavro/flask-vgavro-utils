@@ -23,7 +23,7 @@ def create_schema(schema_or_dict, extends=None, **kwargs):
         return schema_or_dict
 
 
-def request_schema(schema_or_dict, extends=None, many=None, cache_schema=True):
+def request_schema(schema_or_dict, extends=None, many=None, cache_schema=True, pass_data=False):
     schema_ = create_schema(schema_or_dict, extends)
 
     def decorator(func):
@@ -32,22 +32,28 @@ def request_schema(schema_or_dict, extends=None, many=None, cache_schema=True):
             schema = cache_schema and schema_ or create_schema(schema_or_dict, extends)
 
             data = schema.load(request.json, many=many).data
-            kwargs.update({'data': data})
+            if pass_data:
+                kwargs.update({pass_data if pass_data is not True else pass_data: data})
+            else:
+                kwargs.update(**data)
             return func(*args, **kwargs)
 
         return wrapper
     return decorator
 
 
-def request_args_schema(schema_or_dict, extends=None, cache_schema=True):
+def request_args_schema(schema_or_dict, extends=None, cache_schema=True, pass_data=False):
     schema_ = create_schema(schema_or_dict, extends)
 
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
             schema = cache_schema and schema_ or create_schema(schema_or_dict, extends)
-            request_args = schema.load(request.args).data
-            kwargs.update(request_args)
+            data = schema.load(request.args).data
+            if pass_data:
+                kwargs.update({pass_data if pass_data is not True else pass_data: data})
+            else:
+                kwargs.update(**data)
             return func(*args, **kwargs)
 
         return wrapper
