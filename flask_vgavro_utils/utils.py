@@ -7,7 +7,6 @@ import json
 
 from werkzeug.local import LocalProxy
 from werkzeug.utils import import_string
-from flask import g
 
 
 class classproperty(property):
@@ -123,20 +122,6 @@ def is_instance_or_proxied(obj, cls):
     if isinstance(obj, LocalProxy):
         obj = obj._get_current_object()
     return isinstance(obj, cls)
-
-
-def local_proxy_on_g(attr_name=None):
-    def decorator(func):
-        attr = attr_name or func.__name__
-
-        def wrapper():
-            if g:
-                if not hasattr(g, attr):
-                    setattr(g, attr, func())
-                return getattr(g, attr)
-        return LocalProxy(wrapper)
-
-    return decorator
 
 
 def get_git_repository_info(path='./'):

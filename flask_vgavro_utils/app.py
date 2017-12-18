@@ -44,6 +44,13 @@ def register_api_error_handlers(app, exception=ApiError, wrapper=lambda r: r):
             'code': 404,
         })
 
+    @app.errorhandler(400)
+    def handle_400_error(exc):
+        return response(400, {
+            'message': 'Bad request: {}'.format(exc.description),
+            'code': 400,
+        })
+
     @app.errorhandler(Exception)
     def handle_internal_error(exc):
         if app.debug and (app.testing or request.headers.get('X-DEBUGGER') or
