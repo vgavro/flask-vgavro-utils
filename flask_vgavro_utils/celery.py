@@ -1,4 +1,4 @@
-def create_celery(app):
+def create_celery(app, task_views=False):
     from celery import Celery
 
     celery = Celery(app.import_name, backend=app.config['CELERY_RESULT_BACKEND'],
@@ -17,6 +17,9 @@ def create_celery(app):
     celery.Task = ContextTask
 
     app.extensions['celery'] = celery
+    if task_views:
+        task_views = '/task/<task_id>'
+        register_task_views(app, task_views)
     return celery
 
 

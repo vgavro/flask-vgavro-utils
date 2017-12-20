@@ -1,13 +1,20 @@
+import logging
+import logging.config
 import datetime
 import decimal
 import enum
 import traceback
 
-from flask import Response, jsonify, request
+from flask import Flask, Response, jsonify, request, current_app
 from flask.json import JSONEncoder
 from marshmallow import ValidationError
 
 from .exceptions import ApiError, EntityError
+
+try:
+    from celery.result import EagerResult, AsyncResult
+except ImportError:
+    EagerResult, AsyncResult = (), ()  # for isinstance False
 
 
 class ApiJSONEncoder(JSONEncoder):
@@ -23,71 +30,80 @@ class ApiJSONEncoder(JSONEncoder):
         return super().default(obj)
 
 
-def register_api_error_handlers(app, exception=ApiError, wrapper=lambda r: r):
-    def response(status_code, error):
-        response = jsonify(wrapper({'error': error}))
-        response.status_code = status_code
+class ApiResponse(Response):
+    @classmethod
+    def force_type(cls, response, environ=None):
+        if isinstance(response, EagerResult):
+            response.maybe_throw()
+            response = response.result  # TODO: also wrapper here?
+        if isinstance(response, AsyncResult):
+            response = jsonify(current_app.response_wrapper({'task_id': response.id}))
+            response.status_code = 202
+        elif isinstance(response, dict):
+            response = jsonify(current_app.response_wrapper(response))
+        return super().force_type(response, environ)
+
+
+class ApiFlask(Flask):
+    response_class = ApiResponse
+    json_encoder = ApiJSONEncoder
+
+    def __init__(self, *args, config_from_object=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if config_from_object:
+            self.config.from_object(config_from_object)
+        if 'LOGGING' in self.config:
+            # Turn off werkzeug default handlers not to duplicate logs
+            logging.getLogger('werkzeug').handlers = []
+            logging.config.dictConfig(self.config['LOGGING'])
+
+        self._register_api_error_handlers()
+
+    def response_wrapper(self, response):
         return response
 
-    @app.errorhandler(ValidationError)
-    def handle_validation_error(exc):
-        return handle_api_error(EntityError.from_validation_error(exc))
+    def _register_api_error_handlers(self):
+        def response(status_code, error):
+            response = jsonify(self.response_wrapper({'error': error}))
+            response.status_code = status_code
+            return response
 
-    @app.errorhandler(exception)
-    def handle_api_error(exc):
-        return response(exc.status_code, exc.to_dict())
+        @self.errorhandler(ValidationError)
+        def handle_validation_error(exc):
+            return handle_api_error(EntityError.from_validation_error(exc))
 
-    @app.errorhandler(404)
-    def handle_404_error(exc):
-        return response(404, {
-            'message': 'URL not found: {}'.format(request.url),
-            'code': 404,
-        })
+        @self.errorhandler(ApiError)
+        def handle_api_error(exc):
+            return response(exc.status_code, exc.to_dict())
 
-    @app.errorhandler(400)
-    def handle_400_error(exc):
-        return response(400, {
-            'message': 'Bad request: {}'.format(exc.description),
-            'code': 400,
-        })
-
-    @app.errorhandler(Exception)
-    def handle_internal_error(exc):
-        if app.debug and (app.testing or request.headers.get('X-DEBUGGER') or
-                          app.config.get('FLASK_DEBUGGER_ALWAYS_ON_ERROR')):
-            raise  # raising exception to werkzeug debugger
-
-        err = {
-            'code': 500,
-            'message': str(exc),
-            'repr': repr(exc),
-        }
-        if app.debug:
-            err.update({
-                'traceback': [tuple(row) for row in traceback.extract_tb(exc.__traceback__)],
-                'stack': [tuple(row) for row in traceback.extract_stack()],
+        @self.errorhandler(404)
+        def handle_404_error(exc):
+            return response(404, {
+                'message': 'URL not found: {}'.format(request.url),
+                'code': 404,
             })
-        return response(500, err)
 
+        @self.errorhandler(400)
+        def handle_400_error(exc):
+            return response(400, {
+                'message': 'Bad request: {}'.format(exc.description),
+                'code': 400,
+            })
 
-def register_api_response(app, wrapper=lambda r: r):
-    try:
-        from celery.result import EagerResult, AsyncResult
-    except ImportError:
-        EagerResult, AsyncResult = (), ()  # for isinstance False
+        @self.errorhandler(Exception)
+        def handle_internal_error(exc):
+            if self.debug and (self.testing or request.headers.get('X-DEBUGGER') or
+                               self.config.get('FLASK_DEBUGGER_ALWAYS_ON_ERROR')):
+                raise  # raising exception to werkzeug debugger
 
-    class ApiResponse(Response):
-        @classmethod
-        def force_type(cls, response, environ=None):
-            if isinstance(response, EagerResult):
-                response.maybe_throw()
-                response = response.result
-            if isinstance(response, AsyncResult):
-                response = jsonify(wrapper({'task_id': response.id}))
-                response.status_code = 202
-            elif isinstance(response, dict):
-                response = jsonify(wrapper(response))
-            return super().force_type(response, environ)
-
-    app.response_class = ApiResponse
-    app.json_encoder = ApiJSONEncoder
+            err = {
+                'code': 500,
+                'message': str(exc),
+                'repr': repr(exc),
+            }
+            if self.debug:
+                err.update({
+                    'traceback': [tuple(row) for row in traceback.extract_tb(exc.__traceback__)],
+                    'stack': [tuple(row) for row in traceback.extract_stack()],
+                })
+            return response(500, err)

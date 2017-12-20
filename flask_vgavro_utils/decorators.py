@@ -1,7 +1,7 @@
 from functools import wraps
 
 from marshmallow import Schema
-from flask import request
+from flask import request, make_response
 
 
 def create_schema(schema_or_dict, extends=None, **kwargs):
@@ -74,3 +74,31 @@ def response_schema(schema_or_dict, extends=None, many=None, cache_schema=True):
 
         return wrapper
     return decorator
+
+
+def response_headers(headers={}):
+    """
+    This decorator adds the headers passed in to the response
+    """
+    # http://flask.pocoo.org/snippets/100/
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            resp = make_response(func(*args, **kwargs))
+            h = resp.headers
+            for header, value in headers.items():
+                h[header] = value
+            return resp
+        return wrapper
+    return decorator
+
+
+def response_headers_no_cache(func):
+    @wraps(func)
+    @response_headers({
+        'Cache-Control': 'no-store',
+        'Pragma': 'no-cache',
+    })
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    return wrapper
