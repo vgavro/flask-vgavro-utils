@@ -7,7 +7,12 @@ class ApiError(Exception):
 
     def __init__(self, message, code=None, data=None, **kwargs):
         self.message = message
-        self.code = code or self.status_code
+        if code:
+            self.code = code
+            if code < 600:
+                self.status_code = code
+        else:
+            self.code = self.status_code
         self.data = data or {}
         self.data.update(kwargs)
         super().__init__(message, self.code, self.data)
