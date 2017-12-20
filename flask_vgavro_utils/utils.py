@@ -2,10 +2,13 @@ import subprocess
 import logging
 import time
 import contextlib
-from datetime import datetime, date, timezone
+import types
 import json
+from functools import partial
+from datetime import datetime, date, timezone
 
 from werkzeug.local import LocalProxy
+from flask import g
 from werkzeug.utils import import_string
 
 
@@ -122,6 +125,40 @@ def is_instance_or_proxied(obj, cls):
     if isinstance(obj, LocalProxy):
         obj = obj._get_current_object()
     return isinstance(obj, cls)
+
+
+def local_proxy_on_g(attr_name=None):
+    def decorator(func):
+        attr = attr_name or func.__name__
+
+        def wrapper():
+            if g:
+                if not hasattr(g, attr):
+                    setattr(g, attr, func())
+                return getattr(g, attr)
+        return LocalProxy(wrapper)
+    return decorator
+
+
+def decorator_with_default_args(target):
+    """
+    This decorator should be used on other decorator that implements default kwargs,
+    and therefore may be used as @decorator,  @decorator() or @decorator(key=ovveride_value).
+    Definition example:
+    @decorator_with_default_args
+    def my_decorator(func, key=default_value):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+        return wrapper
+    """
+    def decorator(func=None, **kwargs):
+        if func and isinstance(func, types.FunctionType):
+            return target(func)
+        else:
+            assert not func, 'You should use this decorator only with kwargs'
+            return partial(target, **kwargs)
+    return decorator
 
 
 def get_git_repository_info(path='./'):
