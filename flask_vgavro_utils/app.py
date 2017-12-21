@@ -10,6 +10,7 @@ from flask.json import JSONEncoder
 from marshmallow import ValidationError
 
 from .exceptions import ApiError, EntityError
+from .config import LazyConfigValue
 
 try:
     from celery.result import EagerResult, AsyncResult
@@ -52,7 +53,15 @@ class ApiFlask(Flask):
         super().__init__(*args, **kwargs)
         if config_from_object:
             self.config.from_object(config_from_object)
-        if 'LOGGING' in self.config:
+
+        LazyConfigValue.resolve_config(self.config)
+
+        if self.testing:
+            for key, value in self.config.items():
+                if key.startswith('TESTING_'):
+                    self.config[key[8:]] = value
+
+        if self.config.get('LOGGING'):
             # Turn off werkzeug default handlers not to duplicate logs
             logging.getLogger('werkzeug').handlers = []
             logging.config.dictConfig(self.config['LOGGING'])
