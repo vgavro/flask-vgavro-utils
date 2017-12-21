@@ -189,8 +189,9 @@ def string_repr_short(value, length=64):
 
 class ReprMixin:
     def __repr__(self, *args, exclude=[]):
-        attrs = ', '.join((u'{}={}'.format(k, string_repr_short(v))
-                          for k, v in self.to_dict(*args, exclude=exclude).items()))
+        attrs = ', '.join(u'{}={}'.format(k, string_repr_short(v))
+                          for k, v in self.to_dict(*args).items()
+                          if k not in exclude)
         return '<{}({})>'.format(self.__class__.__name__, attrs)
 
     def to_dict(self, *args, exclude=[]):
