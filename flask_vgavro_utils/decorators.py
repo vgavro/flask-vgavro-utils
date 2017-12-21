@@ -33,9 +33,9 @@ def request_schema(schema_or_dict, extends=None, many=None, cache_schema=True, p
 
             data = schema.load(request.json, many=many).data
             if pass_data:
-                kwargs.update({pass_data if pass_data is not True else pass_data: data})
+                kwargs.update({'data' if pass_data is not True else pass_data: data})
             else:
-                kwargs.update(**data)
+                kwargs.update(data)
             return func(*args, **kwargs)
 
         return wrapper
@@ -51,9 +51,9 @@ def request_args_schema(schema_or_dict, extends=None, cache_schema=True, pass_da
             schema = cache_schema and schema_ or create_schema(schema_or_dict, extends)
             data = schema.load(request.args).data
             if pass_data:
-                kwargs.update({pass_data if pass_data is not True else pass_data: data})
+                kwargs.update({'data' if pass_data is not True else pass_data: data})
             else:
-                kwargs.update(**data)
+                kwargs.update(data)
             return func(*args, **kwargs)
 
         return wrapper
