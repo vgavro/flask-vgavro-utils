@@ -115,4 +115,5 @@ class ApiFlask(Flask):
                     'traceback': [tuple(row) for row in traceback.extract_tb(exc.__traceback__)],
                     'stack': [tuple(row) for row in traceback.extract_stack()],
                 })
+            self.logger.exception('Unexpected exception: %r', exc)
             return response(500, err)

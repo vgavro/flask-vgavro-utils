@@ -19,7 +19,7 @@ class ApiError(Exception):
 
     def to_dict(self):
         result = self.data.copy()
-        result['message'] = self.message
+        result['message'] = self.message or self.data.get('message')
         result['code'] = self.code
         return result
 
@@ -51,6 +51,11 @@ class EntityError(ApiError):
     @classmethod
     def from_validation_error(cls, exc):
         return cls.from_schema_errors(exc.normalized_messages())
+
+    @classmethod
+    def for_fields(cls, data=None, **errors):
+        message = data.get('message') or cls._get_first_error(errors)
+        return cls(message, data=data, errors=errors)
 
     @classmethod
     def _get_first_error(cls, errors):
