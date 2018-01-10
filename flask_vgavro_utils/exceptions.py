@@ -24,6 +24,13 @@ class ApiError(Exception):
         return result
 
 
+class ForbiddenError(ApiError):
+    status_code = 403
+
+    def __init__(self, message='Access forbidden', *args, **kwargs):
+        super().__init__(message, *args, **kwargs)
+
+
 class NotFoundError(ApiError):
     status_code = 404
 
