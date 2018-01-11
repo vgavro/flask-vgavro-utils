@@ -22,19 +22,3 @@ class LazyConfigValue(object):
         for k in sorted([k for k in config if isinstance(config[k], cls)],
                         key=lambda k: config[k]._counter):
             config[k] = config[k].resolve(config)
-
-
-def update_context_from_import(context, module, warn_on_not_found=False):
-    # For using with settings_local
-
-    try:
-        module_context = __import__(module).__dict__
-    except ImportError as e:
-        if e.args[0] and e.args[0].startswith('No module named') and module in e.args[0]:
-            if warn_on_not_found:
-                print('[WARNING] {} not found!'.format(module))
-            module_context = {}
-        else:
-            raise
-
-    context.update({k: v for k, v in module_context.items() if not k.startswith('__')})

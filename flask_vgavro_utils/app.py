@@ -1,3 +1,5 @@
+import os
+import sys
 import logging
 import logging.config
 import datetime
@@ -5,6 +7,7 @@ import decimal
 import enum
 import traceback
 
+from werkzeug.utils import ImportStringError
 from flask import Flask, Response, jsonify, request, current_app
 from flask.json import JSONEncoder
 from marshmallow import ValidationError
@@ -49,10 +52,28 @@ class ApiFlask(Flask):
     response_class = ApiResponse
     json_encoder = ApiJSONEncoder
 
-    def __init__(self, *args, config_from_object=None, **kwargs):
+    def __init__(self, *args, config_object=None, config_override_object=None,
+                 **kwargs):
         super().__init__(*args, **kwargs)
-        if config_from_object:
-            self.config.from_object(config_from_object)
+        self._configure(config_object, config_override_object)
+        self._register_api_error_handlers()
+
+    def _configure(self, config_object=None, config_override_object=None):
+        self.config['TESTING'] = (os.environ.get('FLASK_TESTING', False) or
+                                  sys.argv[0].endswith('pytest'))
+
+        if config_object:
+            self.config.from_object(config_object)
+
+        if config_override_object:
+            try:
+                self.config.from_object(config_override_object)
+            except ImportStringError as exc:
+                exc = exc.exception
+                if not (exc.args[0] and exc.args[0].startswith('No module named') and
+                   config_override_object in exc.args[0]):
+                    # Skip if override module not exist, raise otherwise
+                    raise
 
         LazyConfigValue.resolve_config(self.config)
 
@@ -66,9 +87,8 @@ class ApiFlask(Flask):
             logging.getLogger('werkzeug').handlers = []
             logging.config.dictConfig(self.config['LOGGING'])
 
-        self._register_api_error_handlers()
-
     def response_wrapper(self, response):
+        """Wrapper before jsonify, to extend response dict with meta-data"""
         return response
 
     def _register_api_error_handlers(self):
