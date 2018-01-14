@@ -16,10 +16,14 @@ def create_celery(app, task_views=False):
 
     celery.Task = ContextTask
 
-    app.extensions['celery'] = celery
-    if task_views:
+    if task_views is True:
         task_views = '/task/<task_id>'
+    assert '<task_id>' in task_views
+    if task_views:
         register_task_views(app, task_views)
+
+    celery.task_url = task_views
+    app.extensions['celery'] = celery
     return celery
 
 

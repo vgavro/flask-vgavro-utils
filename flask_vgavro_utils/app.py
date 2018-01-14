@@ -41,7 +41,12 @@ class ApiResponse(Response):
             response.maybe_throw()
             response = response.result  # TODO: also wrapper here?
         if isinstance(response, AsyncResult):
-            response = jsonify(current_app.response_wrapper({'task_id': response.id}))
+            task_url = current_app.extensions['celery'].task_url.replace('<task_id>', response.id)
+            response = {
+                'task_id': response.id,
+                'task_url': request.url_root + task_url,
+            }
+            response = jsonify(current_app.response_wrapper())
             response.status_code = 202
         elif isinstance(response, dict):
             response = jsonify(current_app.response_wrapper(response))
