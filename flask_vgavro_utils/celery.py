@@ -20,15 +20,15 @@ def create_celery(app, task_views=False):
         task_views = '/task/<task_id>'
     assert '<task_id>' in task_views
     if task_views:
-        register_task_views(app, task_views)
+        register_task_views(app, celery, task_views)
 
     celery.task_url = task_views
     app.extensions['celery'] = celery
     return celery
 
 
-def register_task_views(app, rule='/task/<task_id>'):
-    celery = app.extensions['celery']
+def register_task_views(app, celery=None, rule='/task/<task_id>'):
+    celery = celery or app.extensions['celery']
 
     @app.route(rule, methods=['GET'])
     def get_task(task_id):
