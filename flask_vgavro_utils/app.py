@@ -46,7 +46,7 @@ class ApiResponse(Response):
                 'task_id': response.id,
                 'task_url': request.url_root + task_url,
             }
-            response = jsonify(current_app.response_wrapper())
+            response = jsonify(current_app.response_wrapper(response))
             response.status_code = 202
         elif isinstance(response, dict):
             response = jsonify(current_app.response_wrapper(response))
