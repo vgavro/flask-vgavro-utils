@@ -87,8 +87,15 @@ class AttrDict(dict):
     __getattr__ = dict.__getitem__
 
     def __dir__(self):
-        # autocompletion for ipython
+        # Autocompletion for ipython
         return super().__dir__() + list(self.keys())
+
+    def __getstate__(self):
+        # We need it for pickle because it depends on __getattr__
+        return dict(self)
+
+    def __setstate__(self, dict_):
+        self.update(dict_)
 
 
 def maybe_attr_dict(data):

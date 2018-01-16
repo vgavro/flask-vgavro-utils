@@ -36,20 +36,27 @@ class ApiJSONEncoder(JSONEncoder):
 
 class ApiResponse(Response):
     @classmethod
-    def force_type(cls, response, environ=None):
-        if isinstance(response, EagerResult):
-            response.maybe_throw()
-            response = response.result  # TODO: also wrapper here?
-        if isinstance(response, AsyncResult):
-            task_url = current_app.extensions['celery'].task_url.replace('<task_id>', response.id)
+    def force_type(cls, resp, environ=None):
+        if isinstance(resp, EagerResult):
+            resp.maybe_throw()
+            resp = resp.result  # TODO: also wrapper here?
+
+        if isinstance(resp, AsyncResult):
+            task_url = current_app.extensions['celery'].task_url.replace('<task_id>', resp.id)
             response = {
-                'task_id': response.id,
+                'task_id': resp.id,
                 'task_url': request.url_root + task_url,
             }
-            response = jsonify(current_app.response_wrapper(response))
+            response = jsonify(current_app.response_wrapper(resp))
             response.status_code = 202
-        elif isinstance(response, dict):
-            response = jsonify(current_app.response_wrapper(response))
+
+        elif isinstance(resp, ApiError):
+            response = jsonify(current_app.response_wrapper(resp.to_dict()))
+            response.status_code = resp.status_code
+
+        elif isinstance(resp, dict):
+            response = jsonify(current_app.response_wrapper(resp))
+
         return super().force_type(response, environ)
 
 
