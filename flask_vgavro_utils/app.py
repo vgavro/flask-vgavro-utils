@@ -41,23 +41,24 @@ class ApiResponse(Response):
             resp.maybe_throw()
             resp = resp.result  # TODO: also wrapper here?
 
+        rv = resp
+
         if isinstance(resp, AsyncResult):
             task_url = current_app.extensions['celery'].task_url.replace('<task_id>', resp.id)
-            response = {
+            rv = jsonify(current_app.response_wrapper({
                 'task_id': resp.id,
                 'task_url': request.url_root + task_url,
-            }
-            response = jsonify(current_app.response_wrapper(resp))
-            response.status_code = 202
+            }))
+            rv.status_code = 202
 
         elif isinstance(resp, ApiError):
-            response = jsonify(current_app.response_wrapper(resp.to_dict()))
-            response.status_code = resp.status_code
+            rv = jsonify(current_app.response_wrapper(resp.to_dict()))
+            rv.status_code = resp.status_code
 
         elif isinstance(resp, dict):
-            response = jsonify(current_app.response_wrapper(resp))
+            rv = jsonify(current_app.response_wrapper(resp))
 
-        return super().force_type(response, environ)
+        return super().force_type(rv, environ)
 
 
 class ApiFlask(Flask):
