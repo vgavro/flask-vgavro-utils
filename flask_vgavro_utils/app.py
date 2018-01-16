@@ -11,6 +11,7 @@ from werkzeug.utils import ImportStringError
 from flask import Flask, Response, jsonify, request, current_app
 from flask.json import JSONEncoder
 from marshmallow import ValidationError
+from flask_cors import CORS
 
 from .exceptions import ApiError, EntityError
 from .config import LazyConfigValue
@@ -66,12 +67,14 @@ class ApiFlask(Flask):
     json_encoder = ApiJSONEncoder
 
     def __init__(self, *args, config_object=None, config_override_object=None,
-                 **kwargs):
+                 cors=False, response_wrapper=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self._configure(config_object, config_override_object)
+        self._configure(config_object, config_override_object, cors)
         self._register_api_error_handlers()
+        if response_wrapper:
+            self.response_wrapper = response_wrapper
 
-    def _configure(self, config_object=None, config_override_object=None):
+    def _configure(self, config_object, config_override_object, cors):
         self.config['TESTING'] = (os.environ.get('FLASK_TESTING', False) or
                                   sys.argv[0].endswith('pytest'))
 
@@ -85,7 +88,7 @@ class ApiFlask(Flask):
                 exc = exc.exception
                 if not (exc.args[0] and exc.args[0].startswith('No module named') and
                    config_override_object in exc.args[0]):
-                    # Skip if override module not exist, raise otherwise
+                    # skip if override module not exist, raise otherwise
                     raise
 
         LazyConfigValue.resolve_config(self.config)
@@ -94,6 +97,11 @@ class ApiFlask(Flask):
             for key, value in self.config.items():
                 if key.startswith('TESTING_'):
                     self.config[key[8:]] = value
+
+        if cors:
+            # options parsed from config
+            # see https://github.com/corydolphin/flask-cors/blob/master/flask_cors/core.py
+            CORS(self)
 
         if self.config.get('LOGGING'):
             # Turn off werkzeug default handlers not to duplicate logs
