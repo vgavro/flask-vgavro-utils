@@ -231,9 +231,10 @@ def pprint(obj, indent=2, colors=True):
 
 
 class db_transaction(contextlib.ContextDecorator):
-    def __init__(self, db, commit=True, rollback=False):
+    def __init__(self, db, commit=True, rollback=False, callback=None):
         assert not (commit and rollback)
         self.db, self.commit, self.rollback = db, commit, rollback
+        self.callback = callback
         db.session.flush()
 
     def __enter__(self):
@@ -243,11 +244,14 @@ class db_transaction(contextlib.ContextDecorator):
         if not exc_type and self.commit:
             try:
                 self.db.session.commit()
-            except BaseException:
+                self.callback and self.callback(True)
+            except BaseException as exc:
                 self.db.session.close()
+                self.callback and self.callback(exc)
                 raise
         elif exc_type or self.rollback:
             self.db.session.rollback()
+            self.callback and self.callback(exc_value or False)
 
         self.db.session.close()
 
