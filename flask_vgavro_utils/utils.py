@@ -9,6 +9,7 @@ from datetime import datetime, date, timezone
 
 from werkzeug.local import LocalProxy
 from flask import g
+from flask.json import JSONEncoder
 from werkzeug.utils import import_string
 
 
@@ -254,6 +255,17 @@ class db_transaction(contextlib.ContextDecorator):
             self.callback and self.callback(exc_value or False)
 
         self.db.session.close()
+
+
+class TimedeltaJSONEncoder(JSONEncoder):
+    def __init__(self, timedelta_from=None, **kwargs):
+        super().__init__(**kwargs)
+        self.timedelta_from = timedelta_from or datetime.utcnow()
+
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return str(self.timedelta_from - obj)
+        return super().default(obj)
 
 
 def _create_gevent_switch_time_tracer(max_blocking_time, logger):
