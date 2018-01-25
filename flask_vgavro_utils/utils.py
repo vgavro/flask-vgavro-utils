@@ -264,6 +264,8 @@ class TimedeltaJSONEncoder(JSONEncoder):
 
     def default(self, obj):
         if isinstance(obj, datetime):
+            if obj.tzinfo:
+                obj = obj.astimezone(timezone.utc).replace(tzinfo=None)
             return str(self.timedelta_from - obj)
         return super().default(obj)
 
