@@ -6,7 +6,7 @@ from flask.cli import with_appcontext
 import click
 
 from .tests import register_test_helpers
-from .sqlalchemy import db_reinit
+from .sqla import db_reinit
 
 
 def create_shell_context(*paths):

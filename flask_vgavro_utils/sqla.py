@@ -1,7 +1,9 @@
 import logging
 import contextlib
 from threading import get_ident
+from time import time
 
+from flask import current_app
 from flask_sqlalchemy import SQLAlchemy
 
 from .utils import ReprMixin
@@ -35,7 +37,7 @@ class ModelReprMixin(ReprMixin):
         return super().to_dict(*fields, exclude=exclude)
 
 
-def db_reinit(db, bind=None):
+def db_reinit(db=None, bind=None):
     """Reinitialize database"""
     from sqlalchemy.schema import DropTable
     from sqlalchemy.ext.compiler import compiles
@@ -44,43 +46,49 @@ def db_reinit(db, bind=None):
     def _compile_drop_table(element, compiler, **kwargs):
         return compiler.visit_drop_table(element) + " CASCADE"
 
+    if not db:
+        db = current_app.extensions['sqlalchemy'].db
     # NOTE: bind=None to drop_all and create_all only default database
     db.drop_all(bind=bind)
     db.create_all(bind=bind)
     db.session.commit()
 
 
-class db_transaction(contextlib.ContextDecorator):
-    def __init__(self, db, commit=True, rollback=False, log_name=None):
-        assert not (commit and rollback)
+class transaction(contextlib.ContextDecorator):
+    def __init__(self, commit=True, rollback=False, db=None, log_name=None):
+        assert not (commit and rollback), 'Specify commit or rollback'
+        if not db:
+            db = current_app.extensions['sqlalchemy'].db
         self.db, self.commit, self.rollback, self.log_name = \
             db, commit, rollback, log_name
-        if log_name:
-            logger.debug('%s: %s transaction started', log_name, get_ident())
-        db.session.flush()
 
     def __enter__(self):
-        pass
+        if self.log_name:
+            logger.debug('%s: transaction started ident=%s',
+                         self.log_name, get_ident())
+        self.started = time()
+        self.db.session.flush()
 
     def __exit__(self, exc_type, exc_value, exc_tb):
+        delta = time() - self.started
         if not exc_type and self.commit:
             try:
                 self.db.session.commit()
                 if self.log_name:
-                    logger.debug('%s: %s transaction commit',
-                                 self.log_name, get_ident())
+                    logger.debug('%s: transaction commit ident=%s time=%.3f',
+                                 self.log_name, get_ident(), delta)
             except BaseException as exc:
                 self.db.session.close()
                 if self.log_name:
-                    logger.debug('%s: %s transaction commit aborted: %r',
-                                 self.log_name, get_ident(), exc)
+                    logger.debug('%s: transaction commit aborted ident=%s time=%.3f exc=%r',
+                                 self.log_name, get_ident(), delta, exc)
                 raise
         elif exc_type or self.rollback:
             self.db.session.rollback()
             if self.log_name:
-                logger.debug('%s: %s transaction rollback',
-                             self.log_name, get_ident())
+                logger.debug('%s: transaction rollback ident=%s time=%.3f exc=%r',
+                             self.log_name, get_ident(), delta, exc_value)
         elif self.log_name:
-            logger.debug('%s: %s transaction close',
-                         self.log_name, get_ident())
+            logger.debug('%s: transaction close ident=%s time=%.3f',
+                         self.log_name, get_ident(), delta)
         self.db.session.close()
