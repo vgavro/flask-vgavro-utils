@@ -7,7 +7,7 @@ from flask_sqlalchemy import SQLAlchemy
 from .utils import ReprMixin
 
 
-logger = logging.getLogger('flask-vgavro-utils.sqlalchemy')
+logger = logging.getLogger('flask-vgavro-utils.sqla')
 
 
 class SQLAlchemy(SQLAlchemy):
