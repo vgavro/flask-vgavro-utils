@@ -1,7 +1,6 @@
 import subprocess
 import logging
 import time
-import contextlib
 import types
 import json
 from functools import partial
@@ -229,32 +228,6 @@ def pprint(obj, indent=2, colors=True):
             rv = highlight(rv, JsonLexer(), TerminalFormatter())
 
     print(rv)
-
-
-class db_transaction(contextlib.ContextDecorator):
-    def __init__(self, db, commit=True, rollback=False, callback=None):
-        assert not (commit and rollback)
-        self.db, self.commit, self.rollback = db, commit, rollback
-        self.callback = callback
-        db.session.flush()
-
-    def __enter__(self):
-        pass
-
-    def __exit__(self, exc_type, exc_value, exc_tb):
-        if not exc_type and self.commit:
-            try:
-                self.db.session.commit()
-                self.callback and self.callback(True)
-            except BaseException as exc:
-                self.db.session.close()
-                self.callback and self.callback(exc)
-                raise
-        elif exc_type or self.rollback:
-            self.db.session.rollback()
-            self.callback and self.callback(exc_value or False)
-
-        self.db.session.close()
 
 
 class TimedeltaJSONEncoder(JSONEncoder):

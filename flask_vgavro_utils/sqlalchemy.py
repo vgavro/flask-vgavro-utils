@@ -1,6 +1,13 @@
+import logging
+import contextlib
+from threading import get_ident
+
 from flask_sqlalchemy import SQLAlchemy
 
 from .utils import ReprMixin
+
+
+logger = logging.getLogger('flask-vgavro-utils.sqlalchemy')
 
 
 class SQLAlchemy(SQLAlchemy):
@@ -41,3 +48,39 @@ def db_reinit(db, bind=None):
     db.drop_all(bind=bind)
     db.create_all(bind=bind)
     db.session.commit()
+
+
+class db_transaction(contextlib.ContextDecorator):
+    def __init__(self, db, commit=True, rollback=False, log_name=None):
+        assert not (commit and rollback)
+        self.db, self.commit, self.rollback, self.log_name = \
+            db, commit, rollback, log_name
+        if log_name:
+            logger.debug('%s: %s transaction started', log_name, get_ident())
+        db.session.flush()
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        if not exc_type and self.commit:
+            try:
+                self.db.session.commit()
+                if self.log_name:
+                    logger.debug('%s: %s transaction commit',
+                                 self.log_name, get_ident())
+            except BaseException as exc:
+                self.db.session.close()
+                if self.log_name:
+                    logger.debug('%s: %s transaction commit aborted: %r',
+                                 self.log_name, get_ident(), exc)
+                raise
+        elif exc_type or self.rollback:
+            self.db.session.rollback()
+            if self.log_name:
+                logger.debug('%s: %s transaction rollback',
+                             self.log_name, get_ident())
+        elif self.log_name:
+            logger.debug('%s: %s transaction close',
+                         self.log_name, get_ident())
+        self.db.session.close()
