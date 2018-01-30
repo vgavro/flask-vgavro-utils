@@ -1,4 +1,5 @@
 import subprocess
+from urllib.parse import urlencode
 import logging
 import time
 import types
@@ -241,6 +242,12 @@ class TimedeltaJSONEncoder(JSONEncoder):
                 obj = obj.astimezone(timezone.utc).replace(tzinfo=None)
             return str(self.timedelta_from - obj)
         return super().default(obj)
+
+
+def url_with_qs(url, **qs):
+    if qs and not url.endswith('?'):
+        url += '?'
+    return url + urlencode(qs)
 
 
 def _create_gevent_switch_time_tracer(max_blocking_time, logger):
