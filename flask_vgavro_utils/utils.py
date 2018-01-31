@@ -4,7 +4,7 @@ import logging
 import time
 import types
 import json
-from functools import partial
+from functools import partial, wraps
 from datetime import datetime, date, timezone
 
 from werkzeug.local import LocalProxy
@@ -188,24 +188,61 @@ def get_git_repository_info(path='./'):
     return info[path]
 
 
-def string_repr_short(value, length=64):
-    value = str(value)
+def monkey_patch_meth(obj, attr):
+    orig_func = getattr(obj, attr)
+
+    def decorator(func):
+        @wraps(orig_func)
+        def wrapper(*args, **kwargs):
+            return func(orig_func, *args, **kwargs)
+        setattr(obj, attr, wrapper)
+    return decorator
+
+
+def repr_response(resp, full=False):
+    # requests.models.Response
+    if not full and len(resp.content) > 128:
+        content = '{}...{}b'.format(resp.content[:128],
+                                    len(resp.content))
+    else:
+        content = resp.content
+    return '{} {} {}: {}'.format(
+        resp.request.method,
+        resp.status_code,
+        resp.url,
+        content
+    )
+
+
+def repr_str_short(value, length=32):
     if len(value) > length:
-        return value[:length - 3] + '...'
+        return value[:length] + '...'
     return value
 
 
 class ReprMixin:
-    def __repr__(self, *args, exclude=[]):
-        attrs = ', '.join(u'{}={}'.format(k, string_repr_short(v))
-                          for k, v in self.to_dict(*args).items()
-                          if k not in exclude)
+    def __repr__(self, *args, full=False, **kwargs):
+        attrs = ', '.join(u'{}={}'.format(k, repr(v) if full else repr_str_short(repr(v)))
+                          for k, v in self.to_dict(*args, **kwargs).items())
         return '<{}({})>'.format(self.__class__.__name__, attrs)
 
-    def to_dict(self, *args, exclude=[]):
-        args = args or self.__dict__.keys()
-        return {key: getattr(self, key) for key in args
-                if not key.startswith('_') and key not in exclude}
+    def to_dict(self, *args, exclude=[], required=True):
+        if not args:
+            args = self.__dict__.keys()
+        return {key: self.__dict__[key] for key in args
+                if not key.startswith('_') and key not in exclude and
+                (required or key in self.__dict__)}
+
+    def _pprint(self, *args, **kwargs):
+        return pprint(self, *args, **kwargs)
+
+
+class SlotsReprMixin(ReprMixin):
+    def to_dict(self, *args, exclude=[], required=True):
+        return {k: getattr(self, k) for k in (args or self.__slots__)
+                if not k.startswith('_') and
+                (hasattr(self, k) or (args and required and k in args)) and
+                k not in exclude}
 
 
 def pprint(obj, indent=2, colors=True):
