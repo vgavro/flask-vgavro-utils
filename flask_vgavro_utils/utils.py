@@ -188,14 +188,19 @@ def get_git_repository_info(path='./'):
     return info[path]
 
 
-def monkey_patch_meth(obj, attr):
+def monkey_patch_meth(obj, attr, safe=True):
     orig_func = getattr(obj, attr)
 
     def decorator(func):
         @wraps(orig_func)
         def wrapper(*args, **kwargs):
             return func(orig_func, *args, **kwargs)
-        setattr(obj, attr, wrapper)
+
+        flag_attr = '_monkey_patched_{}'.format(attr)
+        if not safe or not hasattr(obj, flag_attr):
+            setattr(obj, attr, wrapper)
+            if safe:
+                setattr(obj, flag_attr, True)
     return decorator
 
 
