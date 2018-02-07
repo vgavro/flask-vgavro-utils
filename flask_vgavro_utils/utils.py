@@ -85,7 +85,11 @@ def resolve_obj_path(obj, path, supress_exc=False):
 
 
 class AttrDict(dict):
-    __getattr__ = dict.__getitem__
+    def __getattr__(self, attr):
+        try:
+            return self[attr]
+        except KeyError:
+            raise AttributeError(attr)
 
     def __dir__(self):
         # Autocompletion for ipython
@@ -226,9 +230,10 @@ def repr_str_short(value, length=32):
 
 
 class ReprMixin:
-    def __repr__(self, *args, full=False, **kwargs):
+    def __repr__(self, *args, full=False, required=False, **kwargs):
+        attrs = self.to_dict(*args, required=required, **kwargs)
         attrs = ', '.join(u'{}={}'.format(k, repr(v) if full else repr_str_short(repr(v)))
-                          for k, v in self.to_dict(*args, **kwargs).items())
+                          for k, v in attrs.items())
         return '<{}({})>'.format(self.__class__.__name__, attrs)
 
     def to_dict(self, *args, exclude=[], required=True):
@@ -254,9 +259,9 @@ def pprint(obj, indent=2, colors=True):
     def default(obj):
         if isinstance(obj, (datetime, date)):
             return obj.isoformat()
-        if isinstance(obj, ReprMixin):
+        elif hasattr(obj, 'to_dict'):
             return obj.to_dict()
-        raise TypeError('Type %s not serializable' % type(obj))
+        return repr(obj)
 
     rv = json.dumps(obj, default=default, indent=indent, ensure_ascii=False)
 

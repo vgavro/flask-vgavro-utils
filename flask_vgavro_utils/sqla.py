@@ -32,9 +32,9 @@ class SQLAlchemy(SQLAlchemy):
 
 class ModelReprMixin(ReprMixin):
     # See for all fields https://stackoverflow.com/a/2448930/450103
-    def to_dict(self, *args, exclude=[]):
+    def to_dict(self, *args, **kwargs):
         fields = args or [c.name for c in self.__table__.columns]
-        return super().to_dict(*fields, exclude=exclude)
+        return super().to_dict(*fields, **kwargs)
 
 
 def db_reinit(db=None, bind=None):
