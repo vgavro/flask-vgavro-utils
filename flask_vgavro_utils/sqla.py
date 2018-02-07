@@ -57,12 +57,12 @@ def db_reinit(db=None, bind=None):
 class transaction(contextlib.ContextDecorator):
     def __init__(self, commit=True, rollback=False, db=None, log_name=None):
         assert not (commit and rollback), 'Specify commit or rollback'
-        if not db:
-            db = current_app.extensions['sqlalchemy'].db
         self.db, self.commit, self.rollback, self.log_name = \
             db, commit, rollback, log_name
 
     def __enter__(self):
+        if not self.db:
+            self.db = current_app.extensions['sqlalchemy'].db
         if self.log_name:
             logger.debug('%s: transaction started ident=%s',
                          self.log_name, get_ident())
