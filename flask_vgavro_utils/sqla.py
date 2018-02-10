@@ -5,8 +5,9 @@ from time import time
 
 from flask import current_app
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm.exc import DetachedInstanceError
 
-from .utils import ReprMixin
+from .repr import ReprMixin
 
 
 logger = logging.getLogger('flask-vgavro-utils.sqla')
@@ -32,6 +33,12 @@ class SQLAlchemy(SQLAlchemy):
 
 class ModelReprMixin(ReprMixin):
     # See for all fields https://stackoverflow.com/a/2448930/450103
+    def __repr__(self, *args, **kwargs):
+        try:
+            return super().__repr__(*args, **kwargs)
+        except DetachedInstanceError as exc:
+            return '<{} {!r}>'.format(self.__class__.__name__, exc)
+
     def to_dict(self, *args, **kwargs):
         fields = args or [c.name for c in self.__table__.columns]
         return super().to_dict(*fields, **kwargs)
@@ -55,40 +62,45 @@ def db_reinit(db=None, bind=None):
 
 
 class transaction(contextlib.ContextDecorator):
-    def __init__(self, commit=True, rollback=False, db=None, log_name=None):
-        assert not (commit and rollback), 'Specify commit or rollback'
-        self.db, self.commit, self.rollback, self.log_name = \
-            db, commit, rollback, log_name
+    def __init__(self, commit=False, rollback=False, session=None,
+                 ctx_name=None, logger=None):
+        assert not (commit and rollback), 'Specify commit or rollback, not both'
+        self.session, self.commit, self.rollback, self.ctx_name = \
+            session, commit, rollback, ctx_name
 
     def __enter__(self):
-        if not self.db:
-            self.db = current_app.extensions['sqlalchemy'].db
-        if self.log_name:
-            logger.debug('%s: transaction started ident=%s',
-                         self.log_name, get_ident())
+        if not self.session:
+            self.session = current_app.extensions['sqlalchemy'].db.session
+        if self.ctx_name:
+            logger_ = current_app.logger if current_app.logger else logger
+
+            def log(msg, *args, **kwargs):
+                logger_.debug('{}: transaction {}'.format(self.ctx_name, msg),
+                              *args, **kwargs)
+            self.log = log
+            self.log('started ident=%s', get_ident())
         self.started = time()
-        self.db.session.flush()
+        self.session.flush()
 
     def __exit__(self, exc_type, exc_value, exc_tb):
         delta = time() - self.started
         if not exc_type and self.commit:
             try:
-                self.db.session.commit()
-                if self.log_name:
-                    logger.debug('%s: transaction commit ident=%s time=%.3f',
-                                 self.log_name, get_ident(), delta)
+                self.session.commit()
+                if self.ctx_name:
+                    self.log('commit ident=%s time=%.3f', get_ident(), delta)
             except BaseException as exc:
-                self.db.session.close()
-                if self.log_name:
-                    logger.debug('%s: transaction commit aborted ident=%s time=%.3f exc=%r',
-                                 self.log_name, get_ident(), delta, exc)
+                self.session.close()
+                if self.ctx_name:
+                    self.log('commit aborted ident=%s time=%.3f exc=%r',
+                             get_ident(), delta, exc)
                 raise
         elif exc_type or self.rollback:
-            self.db.session.rollback()
-            if self.log_name:
-                logger.debug('%s: transaction rollback ident=%s time=%.3f exc=%r',
-                             self.log_name, get_ident(), delta, exc_value)
-        elif self.log_name:
-            logger.debug('%s: transaction close ident=%s time=%.3f',
-                         self.log_name, get_ident(), delta)
-        self.db.session.close()
+            self.session.rollback()
+            if self.ctx_name:
+                self.log('rollback ident=%s time=%.3f exc=%r',
+                         get_ident(), delta, exc_value)
+        elif self.ctx_name:
+            # TODO: looks like close explicitly do the rollback anyway
+            self.log('close ident=%s time=%.3f', get_ident(), delta)
+        self.session.close()

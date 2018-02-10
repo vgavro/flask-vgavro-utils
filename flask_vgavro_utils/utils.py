@@ -1,16 +1,15 @@
+import sys
 import subprocess
 from urllib.parse import urlencode
 import logging
-import time
 import types
-import json
 from functools import partial, wraps
-from datetime import datetime, date, timezone
+from datetime import datetime, time, timezone
 
 from werkzeug.local import LocalProxy
 from flask import g
-from flask.json import JSONEncoder
 from werkzeug.utils import import_string
+import dateutil
 
 
 class classproperty(property):
@@ -109,24 +108,32 @@ def maybe_attr_dict(data):
     return data
 
 
-def hstore_dict(value):
-    return {k: str(v) for k, v in value.items()}
+def maybe_encode(data, encoding='utf-8'):
+    return str(data).encode(encoding) if isinstance(data, bytes) else data
 
 
-def maybe_encode(string, encoding='utf-8'):
-    return isinstance(string, bytes) and string or str(string).encode(encoding)
+def maybe_decode(data, encoding='utf-8'):
+    return data.decode(encoding) if isinstance(data, str) else data
 
 
-def maybe_decode(string, encoding='utf-8'):
-    return isinstance(string, str) and string.decode(encoding) or string
+def maybe_import_string(value):
+    return import_string(value) if isinstance(value, str) else value
 
 
-def maybe_import(value):
-    return isinstance(value, str) and import_string(value) or value
-
-
-def datetime_from_utc_timestamp(timestamp):
+def parse_timestamp(timestamp):
     return datetime.utcfromtimestamp(float(timestamp)).replace(tzinfo=timezone.utc)
+
+
+def parse_time(data):
+    hours, minutes, seconds, *_ = data.split(':') + [0, 0]
+    return time(int(hours), int(minutes), int(seconds))
+
+
+def parse_datetime(data, tzinfo):
+    datetime = dateutil.parser.parse(data)
+    if not datetime.tzinfo:
+        datetime.replace(tzinfo=tzinfo)
+    return datetime
 
 
 def utcnow():
@@ -208,116 +215,30 @@ def monkey_patch_meth(obj, attr, safe=True):
     return decorator
 
 
-def repr_response(resp, full=False):
-    # requests.models.Response
-    if not full and len(resp.content) > 128:
-        content = '{}...{}b'.format(resp.content[:128],
-                                    len(resp.content))
-    else:
-        content = resp.content
-    return '{} {} {}: {}'.format(
-        resp.request.method,
-        resp.status_code,
-        resp.url,
-        content
-    )
-
-
-def repr_str_short(value, length=32):
-    if len(value) > length:
-        return value[:length] + '...'
-    return value
-
-
-class ReprMixin:
-    def __repr__(self, *args, full=False, required=False, **kwargs):
-        attrs = self.to_dict(*args, required=required, **kwargs)
-        attrs = ', '.join(u'{}={}'.format(k, repr(v) if full else repr_str_short(repr(v)))
-                          for k, v in attrs.items())
-        return '<{}({})>'.format(self.__class__.__name__, attrs)
-
-    def to_dict(self, *args, exclude=[], required=True):
-        if not args:
-            args = self.__dict__.keys()
-        return {key: self.__dict__[key] for key in args
-                if not key.startswith('_') and key not in exclude and
-                (required or key in self.__dict__)}
-
-    def _pprint(self, *args, **kwargs):
-        return pprint(self, *args, **kwargs)
-
-
-class SlotsReprMixin(ReprMixin):
-    def to_dict(self, *args, exclude=[], required=True):
-        return {k: getattr(self, k) for k in (args or self.__slots__)
-                if not k.startswith('_') and
-                (hasattr(self, k) or (args and required and k in args)) and
-                k not in exclude}
-
-
-def pprint(obj, indent=2, colors=True):
-    def default(obj):
-        if isinstance(obj, (datetime, date)):
-            return obj.isoformat()
-        elif hasattr(obj, 'to_dict'):
-            return obj.to_dict()
-        return repr(obj)
-
-    rv = json.dumps(obj, default=default, indent=indent, ensure_ascii=False)
-
-    if colors:
-        try:
-            from pygments import highlight
-            from pygments.lexers import JsonLexer
-            from pygments.formatters import TerminalFormatter
-        except ImportError:
-            pass
-        else:
-            rv = highlight(rv, JsonLexer(), TerminalFormatter())
-
-    print(rv)
-
-
-class TimedeltaJSONEncoder(JSONEncoder):
-    def __init__(self, timedelta_from=None, **kwargs):
-        super().__init__(**kwargs)
-        self.timedelta_from = timedelta_from or datetime.utcnow()
-
-    def default(self, obj):
-        if isinstance(obj, datetime):
-            if obj.tzinfo:
-                obj = obj.astimezone(timezone.utc).replace(tzinfo=None)
-            return str(self.timedelta_from - obj)
-        return super().default(obj)
-
-
 def url_with_qs(url, **qs):
     if qs and not url.endswith('?'):
         url += '?'
     return url + urlencode(qs)
 
 
-def _create_gevent_switch_time_tracer(max_blocking_time, logger):
-    import gevent.hub
-
-    def _gevent_switch_time_tracer(what, origin_target):
-        origin, target = origin_target
-        if not hasattr(_gevent_switch_time_tracer, '_last_switch_time'):
-            _gevent_switch_time_tracer._last_switch_time = None
-        then = _gevent_switch_time_tracer._last_switch_time
-        now = _gevent_switch_time_tracer._last_switch_time = time.time()
-        if then is not None:
-            blocking_time = now - then
-            if origin is not gevent.hub.get_hub():
-                if blocking_time > max_blocking_time:
-                    msg = "Greenlet blocked the eventloop for %.4f seconds\n"
-                    logger.warning(msg, blocking_time)
-
-    return _gevent_switch_time_tracer
-
-
-def set_gevent_switch_time_tracer(max_blocking_time, logger):
-    # based on http://www.rfk.id.au/blog/entry/detect-gevent-blocking-with-greenlet-settrace/
-    import greenlet
-
-    greenlet.settrace(_create_gevent_switch_time_tracer(max_blocking_time, logger))
+def get_argv_opt(shortname=None, longname=None, is_bool=False):
+    """
+    Simple and naive helper to get option from command line.
+    Returns None on any error.
+    """
+    assert shortname or longname
+    if shortname:
+        assert shortname.startswith('-')
+        try:
+            x = sys.argv.index(shortname)
+            return True if is_bool else sys.argv[x + 1]
+        except (ValueError, IndexError):
+            pass
+    if longname:
+        assert longname.startswith('--')
+        for arg in sys.argv:
+            if arg.startswith(longname):
+                if is_bool and len(longname) == len(arg):
+                    return True
+                if arg[len(longname)] == '=':
+                    return arg[len(longname) + 1:]

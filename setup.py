@@ -19,7 +19,11 @@ setup(
     url='http://github.com/vgavro/flask_vgavro_utils',
     keywords='',
     packages=find_packages(),
-    install_requires=['flask>=0.9'],
+    install_requires=[
+        'flask',
+        'marshmallow',
+        'python-dateutil',
+    ],
     scripts=['./manage'],
     entry_points={
         'flask.commands': [

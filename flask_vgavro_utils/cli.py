@@ -26,7 +26,7 @@ def create_shell_context(*paths):
     return {k: v for k, v in result.items() if not k.startswith('__')}
 
 
-def register_shell_helpers(app, *context_paths, test_helpers=True):
+def register_shell_context(app, *context_paths, test_helpers=True):
     @app.shell_context_processor
     def shell_context_processor():
         ctx = {}
@@ -68,9 +68,3 @@ def dbshell():
         if getattr(url, url_attr, None):
             cmd += ' -{} {}'.format(psql_key, getattr(url, url_attr))
     return os.system(cmd)
-
-
-# Registered in setup.py entry_points
-# def register_cli_commands(app):
-#     app.cli.command()(dbreinit)
-#     app.cli.command()(dbshell)

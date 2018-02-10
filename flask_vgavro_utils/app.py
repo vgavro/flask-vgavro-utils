@@ -2,37 +2,21 @@ import os
 import sys
 import logging
 import logging.config
-import datetime
-import decimal
-import enum
 import traceback
 
-from werkzeug.utils import ImportStringError
 from flask import Flask, Response, jsonify, request, current_app
-from flask.json import JSONEncoder
 from marshmallow import ValidationError
-from flask_cors import CORS
 
+from .config import Config
 from .exceptions import ApiError, EntityError
-from .config import LazyConfigValue
+from .tests import register_test_helpers
+from .cli import register_shell_context
+from .json import ApiJSONEncoder
 
 try:
     from celery.result import EagerResult, AsyncResult
 except ImportError:
     EagerResult, AsyncResult = (), ()  # for isinstance False
-
-
-class ApiJSONEncoder(JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, (datetime.datetime, datetime.date)):
-            return obj.isoformat()
-        if isinstance(obj, decimal.Decimal):
-            return str(obj)
-        if isinstance(obj, enum.Enum):
-            return obj.name
-        if hasattr(obj, 'to_dict'):
-            return obj.to_dict()
-        return super().default(obj)
 
 
 class ApiResponse(Response):
@@ -62,51 +46,68 @@ class ApiResponse(Response):
         return super().force_type(rv, environ)
 
 
-class ApiFlask(Flask):
+class Flask(Flask):
     response_class = ApiResponse
     json_encoder = ApiJSONEncoder
+    config_class = Config
 
-    def __init__(self, *args, config_object=None, config_override_object=None,
-                 cors=False, response_wrapper=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._configure(config_object, config_override_object, cors)
         self._register_api_error_handlers()
-        if response_wrapper:
-            self.response_wrapper = response_wrapper
 
-    def _configure(self, config_object, config_override_object, cors):
+    def configure(self, cors=False, sqlalchemy=False, marshmallow=False,
+                  cache=False, celery=False):
         self.config['TESTING'] = (os.environ.get('FLASK_TESTING', False) or
-                                  sys.argv[0].endswith('pytest'))
+                                  sys.argv[0].endswith('pytest') or
+                                  self.config.get('TESTING', False))
 
-        if config_object:
-            self.config.from_object(config_object)
-
-        if config_override_object:
-            try:
-                self.config.from_object(config_override_object)
-            except ImportStringError as exc:
-                exc = exc.exception
-                if not (exc.args[0] and exc.args[0].startswith('No module named') and
-                   config_override_object in exc.args[0]):
-                    # skip if override module not exist, raise otherwise
-                    raise
-
-        LazyConfigValue.resolve_config(self.config)
+        self.config.resolve_lazy_values()
 
         if self.testing:
             for key, value in self.config.items():
                 if key.startswith('TESTING_'):
                     self.config[key[8:]] = value
-
-        if cors:
-            # options parsed from config
-            # see https://github.com/corydolphin/flask-cors/blob/master/flask_cors/core.py
-            CORS(self)
+            register_test_helpers(self)
 
         if self.config.get('LOGGING'):
             # Turn off werkzeug default handlers not to duplicate logs
             logging.getLogger('werkzeug').handlers = []
             logging.config.dictConfig(self.config['LOGGING'])
+
+        if self.config.get('FLASK_SHELL_CONTEXT'):
+            register_shell_context(self, *self.config['FLASK_SHELL_CONTEXT'])
+
+        if self.config.get('DOZER'):
+            from dozer import Dozer
+            self.wsgi_app = Dozer(self.wsgi_app)
+
+        if self.config.get('DOZER_PROFILER'):
+            from dozer import Profiler
+            self.wsgi_app = Profiler(self.wsgi_app)
+
+        if cors:
+            # options parsed from config
+            # see https://github.com/corydolphin/flask-cors/blob/master/flask_cors/core.py
+            from flask_cors import CORS
+            CORS(self)
+
+        if sqlalchemy:
+            from .sqla import SQLAlchemy
+            from flask_migrate import Migrate
+            db = SQLAlchemy(self)
+            Migrate(self, db, compary_type=True)
+
+        if marshmallow:
+            from flask_marshmallow import Marshmallow
+            Marshmallow(self)
+
+        if cache:
+            from .cache import create_cache
+            create_cache(self)
+
+        if celery:
+            from .celery import create_celery
+            create_celery(self, task_views=True)
 
     def response_wrapper(self, response):
         """Wrapper before jsonify, to extend response dict with meta-data"""
