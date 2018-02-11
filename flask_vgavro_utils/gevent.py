@@ -118,7 +118,7 @@ class GeventFlask(Flask):
                     self.logger.exception('work_forever failed: %r', exc)
                     print(exc, file=sys.stderr)
                     sys.exit(1)
-            self.spawn(wrapper)
+            self._work_forever = app_context(self)(wrapper)
         return decorator
 
     def stop(self, timeout=None):
@@ -164,4 +164,6 @@ def serve_forever(app, stop_signals=[signal.SIGTERM, signal.SIGINT], listen=None
     [gevent.signal(sig, stop) for sig in stop_signals]
 
     app.logger.info('Starting server %s:%s', host, port)
+    if hasattr(app, '_work_forever'):
+        gevent.spawn(app._work_forever)
     server.serve_forever()
