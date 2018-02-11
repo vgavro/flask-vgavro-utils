@@ -109,11 +109,11 @@ def maybe_attr_dict(data):
 
 
 def maybe_encode(data, encoding='utf-8'):
-    return str(data).encode(encoding) if isinstance(data, bytes) else data
+    return data if isinstance(data, bytes) else str(data).encode('utf8')
 
 
 def maybe_decode(data, encoding='utf-8'):
-    return data.decode(encoding) if isinstance(data, str) else data
+    return data if isinstance(data, str) else data.decode(encoding)
 
 
 def maybe_import_string(value):
