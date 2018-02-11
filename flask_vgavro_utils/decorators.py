@@ -59,7 +59,7 @@ def request_args_schema(schema_or_dict, extends=None, cache_schema=True, pass_da
         @wraps(func)
         def wrapper(*args, **kwargs):
             schema = cache_schema and schema_ or create_schema(schema_or_dict, extends)
-            data = schema.load(request.json)
+            data = schema.load(request.args)
             if marshmallow_version < '3.0.0b7':
                 data = data.data
             if pass_data:
