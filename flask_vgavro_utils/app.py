@@ -144,7 +144,7 @@ class Flask(Flask):
         @self.errorhandler(Exception)
         def handle_internal_error(exc):
             if self.debug and (self.testing or request.headers.get('X-DEBUGGER') or
-                               self.config.get('FLASK_DEBUGGER_ALWAYS_ON_ERROR')):
+                               self.config.get('FLASK_DEBUGGER_ALWAYS')):
                 raise  # raising exception to werkzeug debugger
 
             err = {

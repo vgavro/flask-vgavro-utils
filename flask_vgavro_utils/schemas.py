@@ -1,5 +1,5 @@
 import marshmallow as ma
-from marshmallow import fields, validate
+from marshmallow import fields
 
 
 class SeparatedStr(fields.List):
@@ -48,16 +48,7 @@ class StrictSchemaMixin:
     As there is no schema.Meta inheritance, defaults to strict=True on initialization.
     """
     def __init__(self, *args, **kwargs):
-        if 'strict' not in kwargs and not hasattr(self.Meta, 'strict'):
-            kwargs.update({'strict': True})
+        if ma.__version__ < '3.0.0b7':
+            if 'strict' not in kwargs and not hasattr(self.Meta, 'strict'):
+                kwargs.update({'strict': True})
         super().__init__(*args, **kwargs)
-
-
-def attach_marshmallow_helpers(ma_):
-    ma_.SeparatedStr = SeparatedStr
-    ma_.NestedLazy = NestedLazy
-    ma_.validate = validate
-    ma_.ValidationError = ma.ValidationError
-    for decorator_name in ('pre_dump', 'post_dump', 'pre_load', 'post_load',
-                           'validates', 'validates_schema'):
-        setattr(ma_, decorator_name, getattr(ma, decorator_name))

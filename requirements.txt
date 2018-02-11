@@ -1,0 +1,2 @@
+# until flask 0.13 release for proper logging changes
+-e git+ssh://git@github.com/pallets/flask.git#egg=flask

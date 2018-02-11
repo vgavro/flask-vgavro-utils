@@ -1,6 +1,6 @@
 from functools import wraps
 
-from marshmallow import Schema
+from marshmallow import Schema, __version__ as marshmallow_version
 from flask import request, make_response
 
 
@@ -10,7 +10,9 @@ def create_schema(schema_or_dict, extends=None, **kwargs):
             extends = tuple(extends) + (Schema,)
     else:
         extends = (Schema,)
-    kwargs.setdefault('strict', True)
+
+    if marshmallow_version < '3.0.0b7':
+        kwargs.setdefault('strict', True)
 
     if isinstance(schema_or_dict, type):
         return schema_or_dict(**kwargs)
@@ -19,7 +21,8 @@ def create_schema(schema_or_dict, extends=None, **kwargs):
         return type('_Schema', extends, schema_or_dict.copy())(**kwargs)
     else:
         assert isinstance(schema_or_dict, Schema)
-        assert schema_or_dict.strict, 'TypeError on silently passing errors'
+        if marshmallow_version < '3.0.0b7':
+            assert schema_or_dict.strict, 'TypeError on silently passing errors'
         return schema_or_dict
 
 
@@ -31,7 +34,9 @@ def request_schema(schema_or_dict, extends=None, many=None, cache_schema=True, p
         def wrapper(*args, **kwargs):
             schema = cache_schema and schema_ or create_schema(schema_or_dict, extends)
 
-            data = schema.load(request.json, many=many).data
+            data = schema.load(request.json, many=many)
+            if marshmallow_version < '3.0.0b7':
+                data = data.data
             if pass_data:
                 kwargs.update({'data' if pass_data is True else pass_data: data})
             else:
