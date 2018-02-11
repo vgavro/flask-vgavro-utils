@@ -1,6 +1,7 @@
 from werkzeug.utils import cached_property
 from flask import json
 from flask.testing import FlaskClient
+from .repr import repr_str_short
 
 
 class TestResponseMixin(object):
@@ -11,6 +12,10 @@ class TestResponseMixin(object):
     @cached_property
     def content(self):
         return self.data.decode(self.charset)
+
+    def __repr__(self, full=False):
+        content = self.content if full else repr_str_short(self.content, 128)
+        return '<Response {}: {}>'.format(self.status, content)
 
 
 class TestClient(FlaskClient):

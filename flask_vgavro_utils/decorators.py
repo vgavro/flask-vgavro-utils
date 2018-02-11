@@ -3,6 +3,8 @@ from functools import wraps
 from marshmallow import Schema, __version__ as marshmallow_version
 from flask import request, make_response
 
+from .exceptions import ApiError
+
 
 def create_schema(schema_or_dict, extends=None, **kwargs):
     if extends:
@@ -33,6 +35,10 @@ def request_schema(schema_or_dict, extends=None, many=None, cache_schema=True, p
         @wraps(func)
         def wrapper(*args, **kwargs):
             schema = cache_schema and schema_ or create_schema(schema_or_dict, extends)
+            if request.json is None:
+                # NOTE: this should be fixed with marshmallow 3 (and 2.16?)
+                raise ApiError('JSON data required')
+
             data = schema.load(request.json, many=many)
             if marshmallow_version < '3.0.0b7':
                 data = data.data
