@@ -33,7 +33,6 @@ def request_schema(schema_or_dict, extends=None, many=None, cache_schema=True, p
         @wraps(func)
         def wrapper(*args, **kwargs):
             schema = cache_schema and schema_ or create_schema(schema_or_dict, extends)
-
             data = schema.load(request.json, many=many)
             if marshmallow_version < '3.0.0b7':
                 data = data.data
@@ -54,7 +53,9 @@ def request_args_schema(schema_or_dict, extends=None, cache_schema=True, pass_da
         @wraps(func)
         def wrapper(*args, **kwargs):
             schema = cache_schema and schema_ or create_schema(schema_or_dict, extends)
-            data = schema.load(request.args).data
+            data = schema.load(request.json)
+            if marshmallow_version < '3.0.0b7':
+                data = data.data
             if pass_data:
                 kwargs.update({'data' if pass_data is True else pass_data: data})
             else:
@@ -74,8 +75,12 @@ def response_schema(schema_or_dict, extends=None, many=None, cache_schema=True):
             schema = cache_schema and schema_ or create_schema(schema_or_dict, extends)
             result = func(*args, **kwargs)
             if isinstance(result, (list, tuple)) and (schema.many or many):
-                return schema.dump(result, many=many).data
-            return schema.dump(result, many=many).data
+                data = schema.dump(result, many=many)
+            else:
+                data = schema.dump(result, many=many)
+            if marshmallow_version < '3.0.0b7':
+                data = data.data
+            return data
 
         return wrapper
     return decorator
