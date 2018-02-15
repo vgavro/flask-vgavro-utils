@@ -65,42 +65,45 @@ class transaction(contextlib.ContextDecorator):
     def __init__(self, commit=False, rollback=False, session=None,
                  ctx_name=None, logger=None):
         assert not (commit and rollback), 'Specify commit or rollback, not both'
-        self.session, self.commit, self.rollback, self.ctx_name = \
-            session, commit, rollback, ctx_name
+        self.session, self.commit, self.rollback, self.ctx_name, self.logger = \
+            session, commit, rollback, ctx_name, logger
 
     def __enter__(self):
         if not self.session:
             self.session = current_app.extensions['sqlalchemy'].db.session
-        if self.ctx_name:
-            logger_ = current_app.logger if current_app.logger else logger
+        if self.ctx_name or self.logger:
+            logger_ = ((self.logger is not True and self.logger) or
+                       (current_app and current_app.logger) or logger)
 
             def log(msg, *args, **kwargs):
-                logger_.debug('{}: transaction {}'.format(self.ctx_name, msg),
-                              *args, **kwargs)
+                msg = '{}: transaction {} ({})'.format(self.ctx_name, msg,
+                                                       self.session.bind.pool.status())
+                logger_.debug(msg, *args, **kwargs)
+
             self.log = log
             self.log('started ident=%s', get_ident())
+        else:
+            self.log = lambda *args, **kwargs: None
+
         self.started = time()
-        self.session.flush()
+        self.session.flush()  # TODO: wtf? looks like we need it in userflow?
 
     def __exit__(self, exc_type, exc_value, exc_tb):
         delta = time() - self.started
         if not exc_type and self.commit:
             try:
                 self.session.commit()
-                if self.ctx_name:
-                    self.log('commit ident=%s time=%.3f', get_ident(), delta)
+                self.log('commit ident=%s time=%.3f', get_ident(), delta)
             except BaseException as exc:
                 self.session.close()
-                if self.ctx_name:
-                    self.log('commit aborted ident=%s time=%.3f exc=%r',
-                             get_ident(), delta, exc)
+                self.log('commit aborted ident=%s time=%.3f exc=%r',
+                         get_ident(), delta, exc)
                 raise
         elif exc_type or self.rollback:
             self.session.rollback()
-            if self.ctx_name:
-                self.log('rollback ident=%s time=%.3f exc=%r',
-                         get_ident(), delta, exc_value)
-        elif self.ctx_name:
-            # TODO: looks like close explicitly do the rollback anyway
+            self.log('rollback ident=%s time=%.3f exc=%r',
+                     get_ident(), delta, exc_value)
+        else:
+            # NOTE: looks like close explicitly do the rollback anyway
             self.log('close ident=%s time=%.3f', get_ident(), delta)
-        self.session.close()
+            self.session.close()

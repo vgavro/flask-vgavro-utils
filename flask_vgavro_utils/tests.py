@@ -33,3 +33,26 @@ def register_test_helpers(app):
         app.response_class = TestResponse
 
     app.test_client_class = TestClient
+
+
+def check_gevent_concurrency(sleep='time.sleep', callback=None):
+    if isinstance(sleep, str):
+        module = __import__(''.join(sleep.split('.')[:-1]))
+        sleep = getattr(module, sleep.split('.')[-1])
+    callback = callback or (lambda x: print('concurrency={}'.format(x)))
+
+    check_gevent_concurrency._flag = False
+
+    def _set_concurrency():
+        sleep(0.01)
+        check_gevent_concurrency._flag = True
+
+    def _check_concurrency():
+        sleep(0.02)
+        callback(check_gevent_concurrency._flag)
+
+    import gevent
+    gevent.joinall([
+        gevent.spawn(_check_concurrency),
+        gevent.spawn(_set_concurrency),
+    ])

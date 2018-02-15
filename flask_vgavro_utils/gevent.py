@@ -98,7 +98,7 @@ class GeventFlask(Flask):
 
     def create_pool(self, name, size=None):
         assert name not in self.pools, 'Pool {} already created'.format(name.upper())
-        size = size or self.config.get('{}_POOL_SIZE'.format(name))
+        size = size or self.config.get('{}_POOL_SIZE'.format(name.upper()))
         self.pools[name] = Pool(size, greenlet_class=self.greenlet_class)
         return self.pools[name]
 
@@ -134,7 +134,7 @@ class GeventFlask(Flask):
 
 
 def _pool_status(pool):
-    return 'Pool {:d}/{:d}'.format(pool.free_count(), pool.size)
+    return 'Pool {}/{}'.format(pool.free_count(), pool.size)
 
 
 def get_app_status():
@@ -152,18 +152,26 @@ def serve_forever(app, stop_signals=[signal.SIGTERM, signal.SIGINT], listen=None
     server = WSGIServer((host, int(port)), app, spawn=app.create_pool('server'))
 
     def stop():
-        if server.closed:
+        if hasattr(stop, 'stopping'):
             try:
                 app.logger.warn('Multiple exit signals received - aborting.')
             finally:
-                sys.exit('Multiple exit signals received - aborting.')
+                return sys.exit('Multiple exit signals received - aborting.')
+        stop.stopping = True
+
         app.logger.info('Stopping server')
+        if hasattr(app, '_work_forever') and isinstance(app._work_forever, Greenlet):
+            app._work_forever.kill()
         if hasattr(app, '_stop'):
             app._stop()
+        # TODO: we should stop serving requests before app._stop, but for some reason
+        # app._stop is not finishing in this case (maybe timeout?)
         server.stop(5)
+        app.logger.info('Server stopped')
+
     [gevent.signal(sig, stop) for sig in stop_signals]
 
-    app.logger.info('Starting server %s:%s', host, port)
+    app.logger.info('Starting server on %s:%s', host, port)
     if hasattr(app, '_work_forever'):
-        gevent.spawn(app._work_forever)
+        app._work_forever = gevent.spawn(app._work_forever)
     server.serve_forever()
