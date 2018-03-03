@@ -68,22 +68,24 @@ class transaction(contextlib.ContextDecorator):
         self.session, self.commit, self.rollback, self.ctx_name, self.logger = \
             session, commit, rollback, ctx_name, logger
 
+    def __call__(self, func):
+        if not self.ctx_name:
+            self.ctx_name = func.__name__
+        return super().__call__(func)
+
     def __enter__(self):
         if not self.session:
             self.session = current_app.extensions['sqlalchemy'].db.session
-        if self.ctx_name or self.logger:
-            logger_ = ((self.logger is not True and self.logger) or
-                       (current_app and current_app.logger) or logger)
 
-            def log(msg, *args, **kwargs):
-                msg = '{}: transaction {} ({})'.format(self.ctx_name, msg,
-                                                       self.session.bind.pool.status())
-                logger_.debug(msg, *args, **kwargs)
+        logger_ = ((self.logger is not True and self.logger) or
+                   (current_app and current_app.logger) or logger)
 
-            self.log = log
-            self.log('started ident=%s', get_ident())
-        else:
-            self.log = lambda *args, **kwargs: None
+        def log(msg, *args, **kwargs):
+            msg = '{}: transaction {} ({})'.format(self.ctx_name or '?', msg,
+                                                   self.session.bind.pool.status())
+            logger_.debug(msg, *args, **kwargs)
+        self.log = log
+        self.log('started ident=%s', get_ident())
 
         self.started = time()
         self.session.flush()  # TODO: wtf? looks like we need it in userflow?
