@@ -7,6 +7,8 @@ from flask.json import JSONEncoder
 
 class ApiJSONEncoder(JSONEncoder):
     def default(self, obj):
+        if hasattr(obj, '__iter__'):
+            return tuple(obj)
         if isinstance(obj, (datetime, date)):
             return obj.isoformat()
         if isinstance(obj, Decimal):
