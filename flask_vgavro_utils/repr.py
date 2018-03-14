@@ -31,22 +31,14 @@ class ReprMixin:
         return '<{}({})>'.format(self.__class__.__name__, attrs)
 
     def to_dict(self, *args, exclude=[], required=True):
-        if not args:
-            args = self.__dict__.keys()
-        return {key: self.__dict__[key] for key in args
-                if not key.startswith('_') and key not in exclude and
-                (required or key in self.__dict__)}
-
-    def _pprint(self, *args, **kwargs):
-        return pprint(self, *args, **kwargs)
-
-
-class SlotsReprMixin(ReprMixin):
-    def to_dict(self, *args, exclude=[], required=True):
-        return {k: getattr(self, k) for k in (args or self.__slots__)
+        keys = args or (self.__dict__.keys() if hasattr(self, '__dict__') else self.__slots__)
+        return {k: getattr(self, k) for k in keys
                 if not k.startswith('_') and
                 (hasattr(self, k) or (args and required and k in args)) and
                 k not in exclude}
+
+    def _pprint(self, *args, **kwargs):
+        return pprint(self, *args, **kwargs)
 
 
 def pprint(obj, indent=2, colors=True):
