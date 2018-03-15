@@ -8,9 +8,13 @@ import redis
 
 
 def create_cache(app):
+    # TODO: cache by default should be strict! so return strict_cache,
+    # and add serialized_cache instead of cache
     cache = RedisSerializedCache(app.config['REDIS_URL'])
+    strict_cache = RedisCache(app.config['REDIS_URL'])
     func_cache = RedisSerializedCache(app.config['REDIS_URL'], 'FUNC_CACHE')
     app.extensions['cache'] = cache
+    app.extensions['strict_cache'] = strict_cache
     app.extensions['func_cache'] = func_cache
     return cache
 
