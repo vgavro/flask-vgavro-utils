@@ -95,7 +95,7 @@ class Flask(Flask):
             from .sqla import SQLAlchemy
             from flask_migrate import Migrate
             db = SQLAlchemy(self)
-            Migrate(self, db, compary_type=True)
+            Migrate(self, db, compare_type=True)
 
         if marshmallow:
             from flask_marshmallow import Marshmallow
