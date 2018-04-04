@@ -119,7 +119,7 @@ def sync_request(synchronizers, real_request, data, time=None):
     payload = {'time': (time or datetime.utcnow()).isoformat()}
     data_map = {}
 
-    for name, ids_or_instances in data:
+    for name, ids_or_instances in data.items():
         synchronizer = synchronizers[name]
 
         if not isinstance(ids_or_instances[0], SyncMixin):
