@@ -129,7 +129,7 @@ def sync_request(synchronizers, real_request, data, time=None):
         if not isinstance(ids_or_instances[0], SyncMixin):
             data_map[name] = synchronizer.get_instances(ids_or_instances)
         else:
-            data_map[name] = {instance.id: instance for instance in ids_or_instances}
+            data_map[name] = {str(instance.id): instance for instance in ids_or_instances}
 
         payload[name] = {}
         for id, instance in data_map[name].items():
