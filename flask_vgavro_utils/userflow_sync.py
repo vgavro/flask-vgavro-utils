@@ -29,7 +29,7 @@ class Synchronizer:
     @property
     def session(self):
         # TODO: don't use current_app, this should work without scoped session
-        return current_app.db.extensions['sqlalchemy'].db.session
+        return current_app.extensions['sqlalchemy'].db.session
 
     def get_instances(self, ids):
         # Return keys as string to be json-compatible
@@ -61,7 +61,7 @@ class Synchronizer:
 
     def _set_fields(self, instance, data, time):
         for field in data:
-            self._set_field(self, instance, field, data[field], time)
+            self._set_field(instance, field, data[field], time)
 
     def _set_field(self, instance, field, value, time):
         assert field in self.set_fields
@@ -94,24 +94,28 @@ def map_synchronizers(synchronizers):
     return rv
 
 
-def sync_response(synchronizers, data):
+def sync_response(synchronizers, data, session=None):
+    if not session:
+        session = current_app.extensions['sqlalchemy'].db.session
+
+    rv = {'time': datetime.utcnow()}
     time = dateutil_parse(data['time'])
-    rv = {}
-    for name, synchronizer in synchronizers:
+    for name, synchronizer in synchronizers.items():
         if name not in data:
             continue
-        instance_map = synchronizer.get_instances(data[name].keys())
-        rv[name] = {}
-        for id, data in data[name].items():
-            try:
-                instance = instance_map[id]
-            except KeyError:
-                # TODO: warning! No model to sync
-                continue
-            synchronizer.preprocess(instance)
-            synchronizer.set(instance, data, time)
-            rv[name][id] = synchronizer.get(instance)
-            synchronizer.postprocess(instance)
+        with session.no_autoflush:
+            instance_map = synchronizer.get_instances(data[name].keys())
+            rv[name] = {}
+            for id, data in data[name].items():
+                try:
+                    instance = instance_map[id]
+                except KeyError:
+                    # TODO: warning! No model to sync
+                    continue
+                synchronizer.preprocess(instance)
+                synchronizer.set(instance, data, time)
+                rv[name][id] = synchronizer.get(instance)
+                synchronizer.postprocess(instance)
     return rv
 
 
