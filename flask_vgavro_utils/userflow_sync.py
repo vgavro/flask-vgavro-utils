@@ -2,6 +2,7 @@ from datetime import datetime
 
 import sqlalchemy as sa
 from dateutil.parser import parse as dateutil_parse
+from flask import current_app
 
 
 class SyncMixin:
@@ -15,18 +16,38 @@ class Synchronizer:
     model = None
     get_fields = []
     set_fields = []
+    allow_create = False
 
-    def __init__(self, model=None, get_fields=None, set_fields=None):
+    def __init__(self, model=None, get_fields=None, set_fields=None, allow_create=None):
         self.model = model or self.model
         assert issubclass(self.model, SyncMixin)
         self.get_fields = get_fields or self.get_fields
         self.set_fields = set_fields or self.set_fields   # TODO: do we need it here?
         assert self.get_fields or self.set_fields
+        self.allow_create = allow_create if allow_create is not None else self.allow_create
+
+    @property
+    def session(self):
+        # TODO: don't use current_app, this should work without scoped session
+        return current_app.db.extensions['sqlalchemy'].db.session
 
     def get_instances(self, ids):
         # Return keys as string to be json-compatible
-        return {str(obj.id): obj for obj in
-                self.model.query.filter(self.model.id.in_(ids))}
+        ids = set(map(str, ids))
+
+        rv = {str(obj.id): obj for obj in
+              self.model.query.filter(self.model.id.in_(ids))}
+
+        if self.allow_create:
+            for id in ids.difference(rv.keys()):
+                rv[id] = self.create_instance(id)
+
+        return rv
+
+    def create_instance(self, id):
+        instance = self.model(id=id)
+        self.session.add(instance)
+        return instance
 
     def preprocess(self, instance):
         pass
