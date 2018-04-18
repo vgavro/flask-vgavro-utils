@@ -45,7 +45,7 @@ class RedisCache:
         self._redis.decr(self._build_key(key), value)
 
     def delete(self, *keys):
-        map(self._redis.delete, map(self._build_key, keys))
+        tuple(map(self._redis.delete, map(self._build_key, keys)))
 
     def flush(self):
         self._redis.flushdb()
