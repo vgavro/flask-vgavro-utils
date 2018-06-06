@@ -6,7 +6,6 @@ from flask.cli import with_appcontext
 import click
 
 from .tests import register_test_helpers
-from .sqla import db_reinit
 
 
 def create_shell_context(*paths):
@@ -44,6 +43,8 @@ def register_shell_context(app, *context_paths, test_helpers=True):
 @with_appcontext
 def dbreinit(verbose, no_confirm, bind=None):
     """Reinitialize database (temporary before using alembic migrations)"""
+    from .sqla import db_reinit
+
     if not no_confirm:
         click.confirm('This will drop ALL DATA. Do you want to continue?', abort=True)
     db = current_app.extensions['sqlalchemy'].db
