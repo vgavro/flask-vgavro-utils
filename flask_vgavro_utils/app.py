@@ -93,9 +93,13 @@ class Flask(Flask):
 
         if sqlalchemy:
             from .sqla import SQLAlchemy
-            from flask_migrate import Migrate
             db = SQLAlchemy(self)
-            Migrate(self, db, compare_type=True)
+            try:
+                from flask_migrate import Migrate
+            except ImportError:
+                pass
+            else:
+                Migrate(self, db, compare_type=True)
 
         if marshmallow:
             from flask_marshmallow import Marshmallow

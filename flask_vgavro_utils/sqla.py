@@ -44,6 +44,20 @@ class ModelReprMixin(ReprMixin):
         return super().to_dict(*fields, **kwargs)
 
 
+class InstantDefaultsMixin:
+    # https://github.com/kvesteri/sqlalchemy-utils/blob/master/sqlalchemy_utils/listeners.py#L24
+    # instant_defaults_listener
+    # TODO: maybe remove it and use from sqlalchemy_utils?
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for key, column in self.__table__.columns.items():
+            if hasattr(column, 'default') and column.default is not None:
+                if callable(column.default.arg):
+                    setattr(self, key, column.default.arg(self))
+                else:
+                    setattr(self, key, column.default.arg)
+
+
 def db_reinit(db=None, bind=None):
     """Reinitialize database"""
     from sqlalchemy.schema import DropTable
