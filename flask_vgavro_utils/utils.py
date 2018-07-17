@@ -48,7 +48,7 @@ class EntityLoggerAdapter(logging.LoggerAdapter):
         return '[{}] {}'.format(self.entity, msg), kwargs
 
 
-def _resolve_obj_key(obj, key):
+def resolve_obj_key(obj, key):
     if key.isdigit():
         try:
             return obj[int(key)]
@@ -73,10 +73,10 @@ def resolve_obj_path(obj, path, supress_exc=False):
     try:
         dot_pos = path.find('.')
         if dot_pos == -1:
-            return _resolve_obj_key(obj, path)
+            return resolve_obj_key(obj, path)
         else:
             key, path = path[:dot_pos], path[(dot_pos + 1):]
-            return resolve_obj_path(_resolve_obj_key(obj, key), path)
+            return resolve_obj_path(resolve_obj_key(obj, key), path)
     except Exception as exc:
         if supress_exc:
             return exc

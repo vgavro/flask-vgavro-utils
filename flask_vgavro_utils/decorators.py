@@ -1,31 +1,9 @@
 from functools import wraps
 
-from marshmallow import Schema, __version__ as marshmallow_version
 from flask import request, make_response
 
 from .exceptions import ApiError
-
-
-def create_schema(schema_or_dict, extends=None, **kwargs):
-    if extends:
-        if not any(map(lambda s: issubclass(s, Schema), extends)):
-            extends = tuple(extends) + (Schema,)
-    else:
-        extends = (Schema,)
-
-    if marshmallow_version < '3.0.0b7':
-        kwargs.setdefault('strict', True)
-
-    if isinstance(schema_or_dict, type):
-        return schema_or_dict(**kwargs)
-    elif isinstance(schema_or_dict, dict):
-        # NOTE: maybe deepcopy?
-        return type('_Schema', extends, schema_or_dict.copy())(**kwargs)
-    else:
-        assert isinstance(schema_or_dict, Schema)
-        if marshmallow_version < '3.0.0b7':
-            assert schema_or_dict.strict, 'TypeError on silently passing errors'
-        return schema_or_dict
+from .schemas import create_schema, ma_version_lt_300b7
 
 
 def request_schema(schema_or_dict, extends=None, many=None, cache_schema=True, pass_data=False):
@@ -40,7 +18,7 @@ def request_schema(schema_or_dict, extends=None, many=None, cache_schema=True, p
                 raise ApiError('JSON data required')
 
             data = schema.load(request.json, many=many)
-            if marshmallow_version < '3.0.0b7':
+            if ma_version_lt_300b7:
                 data = data.data
             if pass_data:
                 kwargs.update({'data' if pass_data is True else pass_data: data})
@@ -60,7 +38,7 @@ def request_args_schema(schema_or_dict, extends=None, cache_schema=True, pass_da
         def wrapper(*args, **kwargs):
             schema = cache_schema and schema_ or create_schema(schema_or_dict, extends)
             data = schema.load(request.args)
-            if marshmallow_version < '3.0.0b7':
+            if ma_version_lt_300b7:
                 data = data.data
             if pass_data:
                 kwargs.update({'data' if pass_data is True else pass_data: data})
@@ -84,7 +62,7 @@ def response_schema(schema_or_dict, extends=None, many=None, cache_schema=True):
                 data = schema.dump(result, many=many)
             else:
                 data = schema.dump(result, many=many)
-            if marshmallow_version < '3.0.0b7':
+            if ma_version_lt_300b7:
                 data = data.data
             return data
 

@@ -1,11 +1,6 @@
 #!/bin/bash
 set -e
 
-# All variables relative to $ROOT (fix it when needed)
-ENV="env"
-WEBAPP="webapp"
-SETUP_PY="setup.py"
-
 # Determine root directory by VIRTUAL_ENV, fallback to current directory otherwise.
 # Check if environment and setup.py is available.
 if [[ -z $VIRTUAL_ENV ]]; then
@@ -14,64 +9,76 @@ else
   ROOT=`dirname $VIRTUAL_ENV`
 fi
 
-if [[ ! -d $ROOT/$ENV ]]; then
-  echo "ABORT: No virtual environment exists: \"$ROOT/$ENV\""
-  echo "Initialize with: \"virtualenv --python=python3 $ROOT/$ENV\""
+if [[ -d $ROOT/env ]]; then
+  ENV=$ROOT/env
+elif [[ -d $ROOT/venv ]]; then
+  ENV=$ROOT/venv
+else
+  echo "ABORT: No virtual environment exists: \"$ROOT/venv\""
+  echo "Initialize with: \"virtualenv --python=python3 $ROOT/venv\""
   exit 1
-elif [[ ! -f $ROOT/$SETUP_PY ]]; then
-  echo "ABORT: No setup.py exists: '$ROOT/$SETUP_PY'"
+fi
+
+SETUP_PY="$ROOT/setup.py"
+
+if [[ ! -f $SETUP_PY ]]; then
+  echo "ABORT: No setup.py exists: '$SETUP_PY'"
   exit 1
-elif [[ ( ! -d $ROOT/$ENV/bin ) && ( -d $ROOT/$ENV/Scripts ) ]]; then
+elif [[ ( ! -d $ENV/bin ) && ( -d $ENV/Scripts ) ]]; then
   # Looks like we have windows here?
-  ln -s $ROOT/$ENV/Scripts $ROOT/$ENV/bin
+  ln -s $ENV/Scripts $ENV/bin
 fi
 
 # We can't get module name for some reason,
 # so assuming it's same as package name, but with underscores
 # TODO: better cache it somewhere
-FLASK_APP=`$ROOT/$ENV/bin/python $ROOT/setup.py --name`
+FLASK_APP=`$ENV/bin/python $SETUP_PY --name`
 FLASK_APP="${FLASK_APP/-/_}"
 export FLASK_APP
 
+WEBAPP="$ROOT/webapp"
+
 if [[ ($# = 0) || ($1 = "help") || ($1 = "--help") || ($1 = "-h") ]]; then
-  $ROOT/$ENV/bin/flask | grep 'Commands:' -A99
+  $ENV/bin/flask | grep 'Commands:' -A99
   echo
   echo "dev             -- Run devserver (with reload and debugger PIN disabled)"
   echo "install         -- Install/update packages in virtualenv"
   echo "test            -- Run backend tests"
   echo "celery          -- Run celery"
 
-  if [[ -d "$ROOT/$WEBAPP" ]]; then
+  if [[ -d "$WEBAPP" ]]; then
     echo
     echo "webapp install  -- Setup webapp required packages via npm"
     echo "webapp test     -- Run webapp tests"
     echo "webapp [COMMAND]"
-    (cd $ROOT/$WEBAPP && npm run-script | grep -E 'npm run-script' -A99 | grep -E -v 'npm run-script')
+    (cd $WEBAPP && npm run-script | grep -E 'npm run-script' -A99 | grep -E -v 'npm run-script')
   fi
 
 elif [[ $1 = "dev" ]]; then
   export FLASK_DEBUG=1
   export WERKZEUG_DEBUG_PIN=off
-  $ROOT/$ENV/bin/flask run "${@:2}"
+  $ENV/bin/flask run "${@:2}"
 
 elif [[ $1 = "install" ]]; then
   git submodule update --init --recursive
-  $ROOT/$ENV/bin/pip install -e ./
-  $ROOT/$ENV/bin/pip install -r ./requirements.txt
+  $ENV/bin/pip install -e $SETUP_PY
+  if [[ $ROOT/requirements.txt ]]; then
+    $ENV/bin/pip install -r $ROOT/requirements.txt
+  fi
 
 elif [[ $1 = "test" ]]; then
   export FLASK_TESTING=1
-  $ROOT/$ENV/bin/pytest "${@:2}"
+  $ENV/bin/pytest "${@:2}"
 
 elif [[ $1 = "celery" ]]; then
-  $ROOT/$ENV/bin/celery -A $FLASK_APP.celery "${@:2}"
+  $ENV/bin/celery -A $FLASK_APP.celery "${@:2}"
 
 elif [[ ($1 = "webapp") && (($2 = "install") || ($2 = "test") || ($2 = "update")) ]]; then
-  (cd $ROOT/$WEBAPP && npm --silent "${@:2}")
+  (cd $WEBAPP && npm --silent "${@:2}")
 
 elif [[ $1 = "webapp" ]]; then
-  (cd $ROOT/$WEBAPP && npm --silent run "${@:2}")
+  (cd $WEBAPP && npm --silent run "${@:2}")
 
 else
-  $ROOT/env/bin/flask $*
+  $ENV/bin/flask $*
 fi
