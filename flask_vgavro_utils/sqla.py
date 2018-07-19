@@ -48,10 +48,15 @@ class InstantDefaultsMixin:
     # https://github.com/kvesteri/sqlalchemy-utils/blob/master/sqlalchemy_utils/listeners.py#L24
     # instant_defaults_listener
     # TODO: maybe remove it and use from sqlalchemy_utils?
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         for key, column in self.__table__.columns.items():
-            if hasattr(column, 'default') and column.default is not None:
+            if (
+                hasattr(column, 'default') and
+                column.default is not None and
+                getattr(self, key, None) is None and
+                key not in kwargs
+            ):
                 if callable(column.default.arg):
                     setattr(self, key, column.default.arg(self))
                 else:
