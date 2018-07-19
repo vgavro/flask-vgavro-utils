@@ -106,6 +106,8 @@ class NestedFromValue(NestedLazy):
         data = NestedFromValue('type', TYPE_DATA_SCHEMA_MAP)
     """
     def __init__(self, key_or_getter, schema_map, *args, **kwargs):
+        if kwargs.get('many'):
+            raise NotImplementedError()
         if callable(key_or_getter):
             self._getter = key_or_getter
         else:
