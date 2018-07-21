@@ -5,6 +5,7 @@ import logging
 import types
 from functools import partial, wraps
 from datetime import datetime, time, timezone
+import warnings
 
 from werkzeug.local import LocalProxy
 from flask import g
@@ -171,6 +172,18 @@ def decorator_with_default_args(target):
             return func(*args, **kwargs)
         return wrapper
     """
+
+    receipt = """
+    def my_decorator(func=None, **kwargs):
+        if func:
+            return my_decorator()(func)
+
+        def decorator(...)
+    """
+    warnings.warn('decorator_with_default_args deprated. '
+                  'Use this receipt instead: {}'.format(receipt),
+                  DeprecationWarning)
+
     def decorator(func=None, **kwargs):
         if func and isinstance(func, types.FunctionType):
             return target(func)
