@@ -28,12 +28,18 @@ else:
         pass
 
 
+class Schema(ma.Schema):
+    def handle_error(self, exc, obj):
+        exc.schema = self
+        raise exc
+
+
 def create_schema(schema_or_dict, extends=None, **kwargs):
     if extends:
         if not any(map(lambda s: issubclass(s, ma.Schema), extends)):
-            extends = tuple(extends) + (ma.Schema,)
+            extends = tuple(extends) + (Schema,)
     else:
-        extends = (ma.Schema,)
+        extends = (Schema,)
 
     if ma_version_lt_300b7:
         kwargs.setdefault('strict', True)

@@ -19,6 +19,18 @@ except ImportError:
     EagerResult, AsyncResult = (), ()  # for isinstance False
 
 
+def _convert_int_keys_to_str(dict_):
+    # TODO: as of flask 0.12 it's default to sort keys on json dump
+    # and throw exception, but it may be already fixed,
+    # or check related option before processing first
+    for k, v in dict_.items():
+        if isinstance(k, int):
+            dict_[str(k)] = v
+            del dict_[k]
+        if isinstance(v, dict):
+            _convert_int_keys_to_str(v)
+
+
 class ApiResponse(Response):
     @classmethod
     def force_type(cls, resp, environ=None):
@@ -37,10 +49,13 @@ class ApiResponse(Response):
             rv.status_code = 202
 
         elif isinstance(resp, ApiError):
-            rv = jsonify(current_app.response_wrapper(resp.to_dict()))
+            rv = resp.to_dict()
+            _convert_int_keys_to_str(rv)
+            rv = jsonify(current_app.response_wrapper(rv))
             rv.status_code = resp.status_code
 
         elif isinstance(resp, dict):
+            _convert_int_keys_to_str(resp)
             rv = jsonify(current_app.response_wrapper(resp))
 
         return super().force_type(rv, environ)
@@ -119,6 +134,7 @@ class Flask(Flask):
 
     def _register_api_error_handlers(self):
         def response(status_code, error):
+            _convert_int_keys_to_str(error)
             response = jsonify(self.response_wrapper({'error': error}))
             response.status_code = status_code
             return response
