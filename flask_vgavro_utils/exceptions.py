@@ -50,7 +50,7 @@ class EntityError(ApiError):
 
     @classmethod
     def for_fields(cls, data=None, **errors):
-        message = data.get('message') or cls._get_first_error(errors)
+        message = data and data.get('message') or cls._get_first_error(errors)
         return cls(message, data=data, errors=errors)
 
     @classmethod

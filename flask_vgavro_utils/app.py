@@ -25,10 +25,15 @@ def _convert_int_keys_to_str(dict_):
     # or check related option before processing first
     for k, v in dict_.items():
         if isinstance(k, int):
-            dict_[str(k)] = v
-            del dict_[k]
+            k = str(k)
+            dict_[k] = v
+            del dict_[int(k)]
         if isinstance(v, dict):
             _convert_int_keys_to_str(v)
+        elif isinstance(v, (tuple, list)):
+            for x in v:
+                if isinstance(x, dict):
+                    _convert_int_keys_to_str(x)
 
 
 class ApiResponse(Response):
