@@ -9,14 +9,19 @@ class ApiJSONEncoder(JSONEncoder):
     def default(self, obj):
         if hasattr(obj, '__iter__'):
             return tuple(obj)
-        if isinstance(obj, (datetime, date)):
+        elif isinstance(obj, (datetime, date)):
             return obj.isoformat()
-        if isinstance(obj, Decimal):
+        elif isinstance(obj, Decimal):
             return str(obj)
-        if isinstance(obj, Enum):
+        elif isinstance(obj, Enum):
             return obj.name
-        if hasattr(obj, 'to_dict'):
+        elif hasattr(obj, 'to_dict'):
             return obj.to_dict()
+
+        elif self.sort_keys and isinstance(obj, dict):
+            # Python 3.6 in particular has bug(?) with int/str sorting
+            obj = {str(k): v for k, v in obj.items()}
+
         return super().default(obj)
 
 
