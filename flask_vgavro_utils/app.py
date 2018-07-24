@@ -23,7 +23,7 @@ def _convert_int_keys_to_str(dict_):
     # TODO: as of flask 0.12 it's default to sort keys on json dump
     # and throw exception, but it may be already fixed,
     # or check related option before processing first
-    for k, v in dict_.items():
+    for k, v in tuple(dict_.items()):
         if isinstance(k, int):
             k = str(k)
             dict_[k] = v
