@@ -38,11 +38,16 @@ class ApiResponse(Response):
 
         elif isinstance(resp, ApiError):
             rv = resp.to_dict()
+            rv['status'] = 'ERROR'
             rv = jsonify(current_app.response_wrapper(rv))
             rv.status_code = resp.status_code
 
         elif isinstance(resp, dict):
+            rv.setdefault('status', 'OK')
             rv = jsonify(current_app.response_wrapper(resp))
+
+        elif resp is None:
+            rv = jsonify(current_app.response_wrapper({'status': 'OK'}))
 
         return super().force_type(rv, environ)
 
@@ -120,7 +125,8 @@ class Flask(Flask):
 
     def _register_api_error_handlers(self):
         def response(status_code, error):
-            resp = jsonify(self.response_wrapper({'error': error}))
+            error['status'] = 'ERROR'
+            resp = jsonify(self.response_wrapper(error))
             resp.status_code = status_code
             return resp
 
@@ -155,7 +161,8 @@ class Flask(Flask):
             err = {
                 'code': 500,
                 'message': str(exc),
-                'repr': repr(exc),
+                'type': exc.__class__.__name__,
+                'args': [str(x) for x in getattr(exc, 'args', [])],
             }
             if self.debug:
                 err.update({

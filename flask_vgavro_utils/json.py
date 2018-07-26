@@ -16,8 +16,9 @@ class ApiJSONEncoder(JSONEncoder):
         elif isinstance(obj, Enum):
             return obj.name
         elif hasattr(obj, 'to_dict'):
-            return obj.to_dict()
-        elif self.sort_keys and isinstance(obj, dict):
+            obj = obj.to_dict()
+
+        if self.sort_keys and isinstance(obj, dict):
             # Python 3.6 in particular has bug(?) with int/str sorting
             return {str(k): v for k, v in obj.items()}
 
