@@ -62,7 +62,7 @@ class Flask(Flask):
         self._register_api_error_handlers()
 
     def configure(self, cors=False, sqlalchemy=False, marshmallow=False,
-                  cache=False, celery=False):
+                  redis=False, celery=False):
         self.config['TESTING'] = (os.environ.get('FLASK_TESTING', False) or
                                   sys.argv[0].endswith('pytest') or
                                   self.config.get('TESTING', False))
@@ -111,9 +111,9 @@ class Flask(Flask):
             from flask_marshmallow import Marshmallow
             Marshmallow(self)
 
-        if cache:
-            from .cache import create_cache
-            create_cache(self)
+        if redis:
+            from .redis import create_redis
+            create_redis(self)
 
         if celery:
             from .celery import create_celery

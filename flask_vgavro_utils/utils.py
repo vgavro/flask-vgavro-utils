@@ -70,7 +70,7 @@ def resolve_obj_key(obj, key):
                                  .format(key, obj, exc))
 
 
-def resolve_obj_path(obj, path, supress_exc=False):
+def resolve_obj_path(obj, path, suppress_exc=False):
     try:
         dot_pos = path.find('.')
         if dot_pos == -1:
@@ -79,7 +79,7 @@ def resolve_obj_path(obj, path, supress_exc=False):
             key, path = path[:dot_pos], path[(dot_pos + 1):]
             return resolve_obj_path(resolve_obj_key(obj, key), path)
     except Exception as exc:
-        if supress_exc:
+        if suppress_exc:
             return exc
         raise
 
@@ -121,8 +121,8 @@ def maybe_import_string(value):
     return import_string(value) if isinstance(value, str) else value
 
 
-def parse_timestamp(timestamp):
-    return datetime.utcfromtimestamp(float(timestamp)).replace(tzinfo=timezone.utc)
+def parse_timestamp(timestamp, tz=timezone.utc):
+    return datetime.utcfromtimestamp(float(timestamp)).replace(tzinfo=tz)
 
 
 def parse_time(data):
@@ -130,11 +130,14 @@ def parse_time(data):
     return time(int(hours), int(minutes), int(seconds))
 
 
-def parse_datetime(data, tzinfo):
-    datetime = dateutil.parser.parse(data)
-    if not datetime.tzinfo:
-        datetime.replace(tzinfo=tzinfo)
-    return datetime
+def parse_datetime(data, tz=timezone.utc):
+    return maybe_tz(dateutil.parser.parse(data), tz)
+
+
+def maybe_tz(dt, tz=timezone.utc):
+    if not dt.tzinfo:
+        return dt.replace(tzinfo=tz)
+    return dt
 
 
 def utcnow():

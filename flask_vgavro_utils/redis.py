@@ -2,30 +2,58 @@ import inspect
 import functools
 import hashlib
 import pickle
+import time
 
 from flask import current_app
-import redis
+from redis.client import StrictRedis
+from redis.lock import LuaLock
+from redis.exceptions import LockError
 
 
-def create_cache(app):
-    # TODO: cache by default should be strict! so return strict_cache,
-    # and add serialized_cache instead of cache
-    cache = RedisSerializedCache(app.config['REDIS_URL'])
-    strict_cache = RedisCache(app.config['REDIS_URL'])
-    func_cache = RedisSerializedCache(app.config['REDIS_URL'], 'FUNC_CACHE')
-    app.extensions['cache'] = cache
-    app.extensions['strict_cache'] = strict_cache
-    app.extensions['func_cache'] = func_cache
-    return cache
+def create_redis(app):
+    redis_url = app.config['REDIS_URL']
+    app.extensions['redis'] = Redis(redis_url)
+    app.extensions['cache'] = RedisSerializedCache(redis_url)
+    app.extensions['func_cache'] = RedisSerializedCache(redis_url, 'FUNC_CACHE')
+    return app.extensions['redis']
 
 
-class RedisCache:
+class RedisLock(LuaLock):
+    expire_at = None
+
+    def __enter__(self):
+        # Redis default lock __enter__ is always blocking
+        if not self.acquire():
+            raise LockError('Lock was not acquired')
+        return self
+
+    def acquire(self, *args, **kwargs):
+        rv = super().acquire(*args, **kwargs)
+        if rv and self.timeout:
+            self.expire_at = time.time() + self.timeout
+        return rv
+
+    def release(self, *args, **kwargs):
+        self.expire_at = None
+        return super().release(*args, *kwargs)
+
+    def maybe_extend(self, timeout_factor=0.33):
+        if not self.expire_at:
+            raise LockError('Lock was not acquired or no timeout')
+        left = self.expire_at - time.time()
+        if left < 0:
+            raise LockError('Lock was already expired')
+        if left < (self.timeout * timeout_factor):
+            self.extend(self.timeout - left)
+
+
+class Redis:
     _redis_map = {}
 
     def __init__(self, redis_url='redis://localhost:6379/0', base_key=None):
         self.base_key = base_key
         if redis_url not in self._redis_map:
-            self._redis_map[redis_url] = redis.StrictRedis.from_url(redis_url)
+            self._redis_map[redis_url] = StrictRedis.from_url(redis_url)
         self._redis = self._redis_map[redis_url]
 
     def _build_key(self, key):
@@ -45,13 +73,17 @@ class RedisCache:
         self._redis.decr(self._build_key(key), value)
 
     def delete(self, *keys):
-        tuple(map(self._redis.delete, map(self._build_key, keys)))
+        self._redis.delete(*map(self._build_key, keys))
 
     def flush(self):
         self._redis.flushdb()
 
+    def lock(self, name, timeout, **kwargs):
+        name = self._build_key('LOCK:{}'.format(name))
+        return RedisLock(self, name, timeout, **kwargs)
 
-class RedisSerializedCache(RedisCache):
+
+class RedisSerializedCache(Redis):
     def _serialize(self, value):
         return pickle.dumps(value)
 
