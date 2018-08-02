@@ -80,7 +80,7 @@ class Redis:
 
     def lock(self, name, timeout, **kwargs):
         name = self._build_key('LOCK:{}'.format(name))
-        return RedisLock(self, name, timeout, **kwargs)
+        return RedisLock(self._redis, name, timeout, **kwargs)
 
 
 class RedisSerializedCache(Redis):
