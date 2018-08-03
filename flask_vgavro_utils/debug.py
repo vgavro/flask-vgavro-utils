@@ -3,6 +3,13 @@ from inspect import isclass, isroutine
 # Some things based on traced https://github.com/mzipay/Autologging/blob/master/autologging.py
 
 
+def isbound(obj):
+    return (
+        hasattr(obj, "im_self") or  # python2
+        hasattr(obj, "__self__")  # python3
+    )
+
+
 def safe_repr(value):
     if isinstance(value, (list, tuple)):
         try:
@@ -31,10 +38,15 @@ def trace_func(pdb=False, root=''):
     def decorator(func):
         def wrapper(*args, **kwargs):
             print('{}{} CALL args={} kwargs={}'.format(
-                root, func.__name__, safe_repr(args), safe_repr(kwargs))
+                root, func.__name__, safe_repr(args[1:]), safe_repr(kwargs))
             )
-            rv = func(*args, **kwargs)
-            print('{}{} RETURN {}'.format(root, func.__name__, safe_repr(rv)))
+            try:
+                rv = func(*args, **kwargs)
+            except Exception as exc:
+                print('{}{} EXCEPTION {}'.format(root, func.__name__, safe_repr(exc)))
+                raise
+            else:
+                print('{}{} RETURN {}'.format(root, func.__name__, safe_repr(rv)))
             if pdb:
                 # TODO: any way to move inside function context?
                 # Also ipython somehow gets to context where exception was
@@ -45,7 +57,10 @@ def trace_func(pdb=False, root=''):
     return decorator
 
 
-def trace(pdb=False):
+def trace(obj=None, pdb=False):
+    if obj:
+        return trace()(obj)
+
     def decorator(obj):
         if isclass(obj):
             for attr in dir(obj):
@@ -53,9 +68,18 @@ def trace(pdb=False):
                     attr in ('__call__', '__init__')
                 ):
                     meth = getattr(obj, attr)
-                    if isroutine(meth):
-                        meth = trace_func(pdb, root=obj.__name__)(meth)
-                        setattr(obj, attr, meth)
+                    if not isroutine(meth):
+                        continue
+                    if isbound(meth):
+                        # TODO: this is classmethod just skip it for now,
+                        # later added it from autologging, also add context id
+                        # to get call/return pair by same id, not name,
+                        # and object id instead of repr(self).
+                        continue
+
+                    # NOTE: for staticmethod this would fail
+                    meth = trace_func(pdb, root=obj.__name__)(meth)
+                    setattr(obj, attr, meth)
             return obj
         else:
             return trace_func(pdb)(obj)
