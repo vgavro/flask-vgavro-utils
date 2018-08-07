@@ -35,16 +35,22 @@ class RedisLock(LuaLock):
 
     def release(self, *args, **kwargs):
         self.expire_at = None
-        return super().release(*args, *kwargs)
+        return super().release(*args, **kwargs)
 
-    def maybe_extend(self, timeout_factor=0.33):
+    def maybe_extend(self, timeout_factor=0.5):
         if not self.expire_at:
             raise LockError('Lock was not acquired or no timeout')
         left = self.expire_at - time.time()
         if left < 0:
             raise LockError('Lock was already expired')
         if left < (self.timeout * timeout_factor):
-            self.extend(self.timeout - left)
+            extend = self.timeout - left
+            self.expire_at += extend
+            self.extend(extend)
+
+    def extend(self, additional_time):
+        super().extend(additional_time)
+        self.expire_at += additional_time
 
 
 class Redis:
@@ -73,7 +79,7 @@ class Redis:
         self._redis.decr(self._build_key(key), value)
 
     def delete(self, *keys):
-        self._redis.delete(*map(self._build_key, keys))
+        return self._redis.delete(*map(self._build_key, keys))
 
     def flush(self):
         self._redis.flushdb()
@@ -81,6 +87,11 @@ class Redis:
     def lock(self, name, timeout, **kwargs):
         name = self._build_key('LOCK:{}'.format(name))
         return RedisLock(self._redis, name, timeout, **kwargs)
+
+    def flush_locks(self):
+        keys = self._redis.keys(self._build_key('LOCK:*'))
+        if keys:
+            return self._redis.delete(*keys)
 
 
 class RedisSerializedCache(Redis):

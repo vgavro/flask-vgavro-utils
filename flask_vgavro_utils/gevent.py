@@ -161,9 +161,11 @@ def serve_forever(app, stop_signals=[signal.SIGTERM, signal.SIGINT], listen=None
 
         app.logger.info('Stopping server')
         if hasattr(app, '_work_forever') and isinstance(app._work_forever, Greenlet):
-            app._work_forever.kill()
+            app._work_forever.kill(timeout=5)
         if hasattr(app, '_stop'):
             app._stop()
+        for pool in app.pools.values():
+            pool.kill(timeout=5)
         # TODO: we should stop serving requests before app._stop, but for some reason
         # app._stop is not finishing in this case (maybe timeout?)
         server.stop(5)
