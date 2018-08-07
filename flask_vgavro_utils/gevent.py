@@ -96,11 +96,15 @@ class GeventFlask(Flask):
     def greenlet(self, *args, **kwargs):
         return self.greenlet_class(*args, **kwargs)
 
-    def create_pool(self, name, size=None):
-        assert name not in self.pools, 'Pool {} already created'.format(name.upper())
-        size = size or self.config.get('{}_POOL_SIZE'.format(name.upper()))
-        self.pools[name] = Pool(size, greenlet_class=self.greenlet_class)
-        return self.pools[name]
+    def create_pool(self, name=None, size=None):
+        if not name:
+            assert size, 'Anonymous pools can\'t be without size'
+            return Pool(size, greenlet_class=self.greenlet_class)
+        else:
+            assert name not in self.pools, 'Pool {} already created'.format(name.upper())
+            size = size or self.config.get('{}_POOL_SIZE'.format(name.upper()))
+            self.pools[name] = Pool(size, greenlet_class=self.greenlet_class)
+            return self.pools[name]
 
     def work_forever(self, wait_seconds=None):
         wait_seconds = wait_seconds or self.config.get('WORK_FOREVER_WAIT_SECONDS', 0)

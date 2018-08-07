@@ -44,11 +44,11 @@ class RedisLock(LuaLock):
         if left < 0:
             raise LockError('Lock was already expired')
         if left < (self.timeout * timeout_factor):
-            extend = self.timeout - left
-            self.expire_at += extend
-            self.extend(extend)
+            self.extend(self.timeout - left)
 
     def extend(self, additional_time):
+        if not self.expire_at:
+            raise LockError('Lock was not acquired or no timeout')
         super().extend(additional_time)
         self.expire_at += additional_time
 
