@@ -11,10 +11,20 @@ import gevent.monkey
 from gevent.hub import get_hub
 from gevent.pool import Pool
 from gevent.greenlet import Greenlet
+from gevent.lock import Semaphore
 from gevent.pywsgi import WSGIServer
 
 from .app import Flask
 from .utils import get_argv_opt, monkey_patch_meth
+
+
+class Semaphore(Semaphore):
+    """Extends gevent.lock.Semaphore with context."""
+    def __enter__(self):
+        self.acquire()
+
+    def __exit__(self, *args, **kwargs):
+        self.release()
 
 
 def _create_switch_time_tracer(max_blocking_time, logger):
