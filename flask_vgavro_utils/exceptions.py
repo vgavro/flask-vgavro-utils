@@ -63,4 +63,6 @@ class EntityError(ApiError):
         elif isinstance(field_errors, dict):
             # nested schema error
             return cls._get_first_error(field_errors)
-        raise ValueError('Unknown field error type: {}'.format(field_errors))
+        else:
+            # Obviously it's one field
+            return str(field_errors)
