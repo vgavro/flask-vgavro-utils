@@ -4,7 +4,7 @@ import logging
 import logging.config
 import traceback
 
-from flask import Flask, Response, jsonify, request, current_app
+from flask import Flask, Request, Response, jsonify, request, current_app
 from marshmallow import ValidationError
 
 from .config import Config
@@ -19,7 +19,27 @@ except ImportError:
     EagerResult, AsyncResult = (), ()  # for isinstance False
 
 
-class ApiResponse(Response):
+class Request(Request):
+    def __repr__(self, full=False):
+        if not full:
+            return super().__repr__()
+        args = []
+        try:
+            args.append(maybe_decode(req.url, req.url_charset))
+            args.append('[{}]'.format(req.method))
+            args.append('Headers{}'.format(tuple(req.headers)))
+            if req.form:
+                args.append('Form{}'.format(tuple(req.form.lists())))
+            if req.files:
+                args.append('Files{}'.format(tuple(req.files.lists())))
+            if req.data:
+                args.append('"{}"'.format(tuple(req.get_data(as_text=True))))
+        except Exception:
+            args.append('(invalid WSGI environ)')
+        return '<Request {}>'.format(' '.join(args))
+
+
+class Response(Response):
     @classmethod
     def force_type(cls, resp, environ=None):
         if isinstance(resp, EagerResult):
@@ -53,7 +73,8 @@ class ApiResponse(Response):
 
 
 class Flask(Flask):
-    response_class = ApiResponse
+    request_class = Request
+    response_class = Response
     json_encoder = ApiJSONEncoder
     config_class = Config
 
