@@ -21,20 +21,24 @@ except ImportError:
 
 
 class Request(Request):
+    def __repr_full__(self):
+        # Helper function because of problems with calling __repr__ on LocalProxy
+        return self.__repr__(full=True)
+
     def __repr__(self, full=False):
         if not full:
             return super().__repr__()
         args = []
         try:
-            args.append(maybe_decode(req.url, req.url_charset))
-            args.append('[{}]'.format(req.method))
-            args.append('Headers{}'.format(tuple(req.headers)))
-            if req.form:
-                args.append('Form{}'.format(tuple(req.form.lists())))
-            if req.files:
-                args.append('Files{}'.format(tuple(req.files.lists())))
-            if req.data:
-                args.append('"{}"'.format(tuple(req.get_data(as_text=True))))
+            args.append(maybe_decode(self.url, self.url_charset))
+            args.append('[{}]'.format(self.method))
+            args.append('Headers{}'.format(tuple(self.headers)))
+            if self.form:
+                args.append('Form{}'.format(tuple(self.form.lists())))
+            if self.files:
+                args.append('Files{}'.format(tuple(self.files.lists())))
+            if self.data:
+                args.append('"{}"'.format(self.get_data(as_text=True)))
         except Exception:
             args.append('(invalid WSGI environ)')
         return '<Request {}>'.format(' '.join(args))
