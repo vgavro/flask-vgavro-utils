@@ -12,6 +12,7 @@ from .exceptions import ApiError, EntityError
 from .tests import register_test_helpers
 from .cli import register_shell_context
 from .json import ApiJSONEncoder
+from .utils import maybe_decode
 
 try:
     from celery.result import EagerResult, AsyncResult
