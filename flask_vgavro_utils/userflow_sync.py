@@ -19,24 +19,35 @@ def _maybe_flat_to_dict(data):
 
 
 def _synchronizer_meth_decorator(type_):
-    def decorator(func):
-        func._synchronizer = {'type': type_, 'name': func.__name__}
-        return func
+    def decorator(func=None, name=None):
+        if func:
+            return decorator()(func)
+
+        def decorator(func):
+            func._synchronizer = {
+                'type': type_,
+                'name': name or func.__name__
+            }
+            return func
+
+        return decorator
+    return decorator
 
 
 class Synchronizer:
     model = None
     id_attr = 'id'
-    getters = {}  # field name, field name or callable(instance)
-    setters = {}  # field name, field name or callable(
+    getters = {}  # {field name, attr name or callable(instance)
+    setters = {}  # {field name, attr name or callable(instance, value)
     allow_create = False
 
     getter = staticmethod(_synchronizer_meth_decorator('getters'))
     setter = staticmethod(_synchronizer_meth_decorator('setters'))
 
-    def __init__(self, model=None, getters=None, setters=None, allow_create=None):
+    def __init__(self, model=None, id_attr=None, getters=None, setters=None, allow_create=None):
         self.model = model or self.model
         assert issubclass(self.model, SyncMixin)
+        self.id_attr = id_attr or self.id_attr
 
         self.getters = _maybe_flat_to_dict(getters or self.getters)
         self.setters = _maybe_flat_to_dict(setters or self.setters)
@@ -47,6 +58,26 @@ class Synchronizer:
         assert self.getters or self.setters
 
         self.allow_create = allow_create if allow_create is not None else self.allow_create
+
+        self._register_model_events()
+
+    def _register_model_events(self):
+        register_data_events = False
+        for attr in self.getters.values():
+            if isinstance(attr, str):
+                if hasattr(self.model, attr):
+                    self._register_attr_events(getattr(self.model, attr))
+                else:
+                    register_data_events = True
+        if register_data_events:
+            self._register_attr_events(self.model.data)
+
+    def _register_attr_events(self, attr):
+        sa.event.listen(attr, 'modified', self.set_sync_need)
+        sa.event.listen(attr, 'set', self.set_sync_need)
+
+    def set_sync_need(self, target, value, oldvalue=None, initiator=None):
+        target.sync_need = True
 
     @property
     def name(self):
@@ -60,17 +91,19 @@ class Synchronizer:
     def get_instances(self, ids):
         # Return keys as string to be json-compatible
         ids = set(map(str, ids))
-
-        rv = {str(obj.id): obj for obj in
-              self.model.query.filter(getattr(self.model, self.id_attr).in_(ids))}
-
+        rv = {
+            str(getattr(obj, self.id_attr)): obj
+            for obj in self._get_instances(ids)
+        }
         if self.allow_create:
             for id in ids.difference(rv.keys()):
-                rv[id] = self.create_instance(id)
-
+                rv[id] = self._create_instance(id)
         return rv
 
-    def create_instance(self, id):
+    def _get_instances(self, ids):
+        return self.model.query.filter(getattr(self.model, self.id_attr).in_(ids))
+
+    def _create_instance(self, id):
         instance = self.model(**{self.id_attr: id})
         self.session.add(instance)
         return instance
@@ -100,7 +133,6 @@ class Synchronizer:
                 instance.data[setter] = value
 
     def get(self, instance):
-        instance.sync_need = False
         return self._get_data(instance)
 
     def _get_data(self, instance):
@@ -124,7 +156,7 @@ def map_synchronizers(synchronizers):
         if isinstance(s, type):
             s = s()
         if s.name in rv:
-            raise ImproperlyConfigured('Synchronizer already registered: {}'.format(s.name))
+            raise ImproperlyConfigured('Synchronizer already registered: %s' % s.name)
         rv[s.name] = s
     return rv
 
@@ -151,6 +183,7 @@ def sync_response(synchronizers, data, session=None):
                 synchronizer.set(instance, data, time)
                 rv[name][id] = synchronizer.get(instance)
                 synchronizer.postprocess(instance)
+                instance.sync_need = False
     return rv
 
 
@@ -182,3 +215,4 @@ def sync_request(synchronizers, request, data, time=None):
         for id, instance in instance_map.items():
             synchronizer.set(instance, response[name][id], time)
             synchronizer.postprocess(instance)
+            instance.sync_need = False

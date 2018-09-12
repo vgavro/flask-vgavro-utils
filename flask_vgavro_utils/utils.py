@@ -181,7 +181,9 @@ def decorator_with_default_args(target):
         if func:
             return my_decorator()(func)
 
-        def decorator(...)
+        def decorator(func):
+            return func
+        return decorator
     """
     warnings.warn('decorator_with_default_args deprated. '
                   'Use this receipt instead: {}'.format(receipt),
