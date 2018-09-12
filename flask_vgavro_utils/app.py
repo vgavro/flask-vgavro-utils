@@ -4,7 +4,7 @@ import logging
 import logging.config
 import traceback
 
-from flask import Flask, Response, jsonify, request, current_app
+from flask import Flask, Request, Response, jsonify, request, current_app
 from marshmallow import ValidationError
 
 from .config import Config
@@ -12,6 +12,7 @@ from .exceptions import ApiError, EntityError
 from .tests import register_test_helpers
 from .cli import register_shell_context
 from .json import ApiJSONEncoder
+from .utils import maybe_decode
 
 try:
     from celery.result import EagerResult, AsyncResult
@@ -19,7 +20,31 @@ except ImportError:
     EagerResult, AsyncResult = (), ()  # for isinstance False
 
 
-class ApiResponse(Response):
+class Request(Request):
+    def __repr_full__(self):
+        # Helper function because of problems with calling __repr__ on LocalProxy
+        return self.__repr__(full=True)
+
+    def __repr__(self, full=False):
+        if not full:
+            return super().__repr__()
+        args = []
+        try:
+            args.append(maybe_decode(self.url, self.url_charset))
+            args.append('[{}]'.format(self.method))
+            args.append('Headers{}'.format(tuple(self.headers)))
+            if self.form:
+                args.append('Form{}'.format(tuple(self.form.lists())))
+            if self.files:
+                args.append('Files{}'.format(tuple(self.files.lists())))
+            if self.data:
+                args.append('"{}"'.format(self.get_data(as_text=True)))
+        except Exception:
+            args.append('(invalid WSGI environ)')
+        return '<Request {}>'.format(' '.join(args))
+
+
+class Response(Response):
     @classmethod
     def force_type(cls, resp, environ=None):
         if isinstance(resp, EagerResult):
@@ -53,7 +78,8 @@ class ApiResponse(Response):
 
 
 class Flask(Flask):
-    response_class = ApiResponse
+    request_class = Request
+    response_class = Response
     json_encoder = ApiJSONEncoder
     config_class = Config
 
