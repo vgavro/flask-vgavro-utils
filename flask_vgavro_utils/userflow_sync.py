@@ -1,4 +1,5 @@
 from datetime import datetime
+from collections import defaultdict
 
 import sqlalchemy as sa
 from dateutil.parser import parse as dateutil_parse
@@ -12,6 +13,13 @@ class SyncMixin:
     synced_at = sa.Column(sa.DateTime, nullable=True)
     # Is data changed and userfow need sync?
     sync_need = sa.Column(sa.Boolean(), nullable=True)
+
+
+def _maybe_to_flat(data):
+    rv = tuple(data)
+    if rv and isinstance(rv[0], (tuple, list, set)):
+        return tuple(x[0] for x in rv)
+    return rv
 
 
 def _maybe_flat_to_dict(data):
@@ -172,11 +180,11 @@ def map_synchronizers(synchronizers):
 
 
 def synchronize(synchronizers, request, batch_size=100):
-    data, counter = {}, 0
+    data, counter = defaultdict(list), 0
     unfinished = []
 
     for name, synchronizer in synchronizers.items():
-        for id in synchronizer.get_ids_for_sync():
+        for id in _maybe_to_flat(synchronizer.get_ids_for_sync()):
             data[name].append(id)
             counter += 1
             if counter >= batch_size:
@@ -207,14 +215,14 @@ def sync_response(synchronizers, data, session=None):
         with session.no_autoflush:
             instance_map = synchronizer.get_instances(data[name].keys())
             rv[name] = {}
-            for id, data in data[name].items():
+            for id, data_ in data[name].items():
                 try:
                     instance = instance_map[id]
                 except KeyError:
                     # TODO: warning! No model to sync
                     continue
                 synchronizer.preprocess(instance)
-                synchronizer.set(instance, data, time)
+                synchronizer.set(instance, data_, time)
                 rv[name][id] = synchronizer.get(instance)
                 synchronizer.postprocess(instance)
                 instance.sync_need = False
