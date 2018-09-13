@@ -68,7 +68,7 @@ class Synchronizer:
         register_data_events = False
         for attr in self.getters.values():
             if isinstance(attr, str):
-                if hasattr(self.model, attr):
+                if attr in self.model.__table__.columns:
                     self._register_attr_events(getattr(self.model, attr))
                 else:
                     register_data_events = True
