@@ -15,7 +15,10 @@ class SyncMixin:
 
 
 def _maybe_flat_to_dict(data):
-    return {f: f for f in data} if isinstance(data, (tuple, list, set)) else data
+    return {
+        f if isinstance(f, str) else f[0]: f if isinstance(f, str) else f[1]
+        for f in data
+    } if isinstance(data, (tuple, list, set)) else data
 
 
 def _synchronizer_meth_decorator(type_):
@@ -150,10 +153,8 @@ class Synchronizer:
                 return instance.data.get(field)
 
     def get_ids_for_sync(self):
-        return tuple(
-            self.session.query(getattr(self.model, self.id_attr))
-            .filter_by(sync_need=True)
-        )
+        return (self.session.query(getattr(self.model, self.id_attr))
+                .filter_by(sync_need=True))
 
     def finish(self):
         pass
