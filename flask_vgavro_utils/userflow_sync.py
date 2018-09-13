@@ -149,6 +149,15 @@ class Synchronizer:
             else:
                 return instance.data.get(field)
 
+    def get_ids_for_sync(self):
+        return tuple(
+            self.session.query(getattr(self.model, self.id_attr))
+            .filter_by(sync_need=True)
+        )
+
+    def finish(self):
+        pass
+
 
 def map_synchronizers(synchronizers):
     rv = {}
@@ -159,6 +168,30 @@ def map_synchronizers(synchronizers):
             raise ImproperlyConfigured('Synchronizer already registered: %s' % s.name)
         rv[s.name] = s
     return rv
+
+
+def synchronize(synchronizers, request, batch_size=100):
+    data, counter = {}, 0
+    unfinished = []
+
+    for name, synchronizer in synchronizers.items():
+        for id in synchronizer.get_ids_for_sync():
+            data[name].append(id)
+            counter += 1
+            if counter >= batch_size:
+                sync_request(synchronizers, request, data)
+                counter = 0
+                [s.finish() for s in unfinished]
+                unfinished = []
+
+        if not counter:
+            synchronizer.finish()
+        else:
+            unfinished.append(synchronizer)
+
+    if counter:
+        sync_request(synchronizers, request, data)
+        [s.finish() for s in unfinished]
 
 
 def sync_response(synchronizers, data, session=None):
