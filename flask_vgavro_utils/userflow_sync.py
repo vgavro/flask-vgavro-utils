@@ -104,7 +104,7 @@ class Synchronizer:
         ids = set(map(str, ids))
         rv = {
             str(getattr(obj, self.id_attr)): obj
-            for obj in self._get_instances(ids)
+            for obj in self._get_instances(map(int, ids))
         }
         if self.allow_create:
             for id in ids.difference(rv.keys()):
@@ -115,7 +115,7 @@ class Synchronizer:
         return self.model.query.filter(getattr(self.model, self.id_attr).in_(ids))
 
     def _create_instance(self, id):
-        instance = self.model(**{self.id_attr: id})
+        instance = self.model(**{self.id_attr: int(id)})
         self.session.add(instance)
         return instance
 
@@ -191,6 +191,7 @@ def synchronize(synchronizers, request, batch_size=100):
             counter += 1
             if counter >= batch_size:
                 sync_request(synchronizers, request, data)
+                data = defaultdict(list)
                 counter = 0
                 [s.finish() for s in unfinished]
                 unfinished = []
