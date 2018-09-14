@@ -141,6 +141,8 @@ class Synchronizer:
             if hasattr(instance, setter):
                 setattr(instance, setter, value)
             else:
+                if instance.data is None:
+                    instance.data = {}
                 instance.data[setter] = value
 
     def get(self, instance):
