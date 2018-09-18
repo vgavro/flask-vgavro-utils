@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from collections import defaultdict
 
@@ -6,6 +7,9 @@ from dateutil.parser import parse as dateutil_parse
 from flask import current_app
 
 from .exceptions import ImproperlyConfigured
+
+
+logger = logging.getLogger('userflow.sync')
 
 
 class SyncMixin:
@@ -222,7 +226,8 @@ def sync_response(synchronizers, data, session=None):
                 try:
                     instance = instance_map[id]
                 except KeyError:
-                    # TODO: warning! No model to sync
+                    logger.warn('Skipped %s %s: no model to sync: %s',
+                                name, id, data_)
                     continue
                 synchronizer.preprocess(instance)
                 synchronizer.set(instance, data_, time)
