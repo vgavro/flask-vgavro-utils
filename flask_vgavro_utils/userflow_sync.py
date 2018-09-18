@@ -210,9 +210,19 @@ def synchronize(synchronizers, request, batch_size=100):
         [s.finish() for s in unfinished]
 
 
+def _repr_payload(synchronizers, data):
+    return '{} {}'.format(
+        data['time'],
+        ', '.join('{}={}'.format(name, len(data_))
+                                 for name, data_ in data.items()
+                                 if name in synchronizers)
+    )
+
+
 def sync_response(synchronizers, data, session=None):
     if not session:
         session = current_app.extensions['sqlalchemy'].db.session
+    log.info('Sync response %s', _repr_payload(synchronizers, data))
 
     rv = {'time': datetime.utcnow()}
     time = dateutil_parse(data['time'])
@@ -234,6 +244,8 @@ def sync_response(synchronizers, data, session=None):
                 rv[name][id] = synchronizer.get(instance)
                 synchronizer.postprocess(instance)
                 instance.sync_need = False
+
+    log.info('Sync response send %s', _repr_payload(synchronizers, rv))
     return rv
 
 
@@ -257,7 +269,9 @@ def sync_request(synchronizers, request, data, time=None):
             synchronizer.preprocess(instance)
             payload[name][id] = synchronizer.get(instance)
 
+    log.info('Sync request %s', _repr_payload(synchronizers, payload))
     response = request(payload)
+    log.info('Sync request receive %s', _repr_payload(synchronizers, response))
 
     time = dateutil_parse(response['time'])
     for name, instance_map in data_map.items():
