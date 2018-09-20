@@ -137,7 +137,8 @@ class Synchronizer:
 
     def _set_data(self, instance, data, time):
         for field in data:
-            self._set_field(instance, field, data[field], time)
+            if field in self.setters:
+                self._set_field(instance, field, data[field], time)
 
     def _set_field(self, instance, field, value, time):
         setter = self.setters[field]
