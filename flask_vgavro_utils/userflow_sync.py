@@ -212,8 +212,8 @@ def synchronize(synchronizers, request, batch_size=100):
 
 def _repr_payload_data(name, data, debug):
     return '{}={}{}'.format(
-        name, len(data_),
-        '({})'.format(tuple(data_.keys())) if debug else ''
+        name, len(data),
+        '({})'.format(tuple(data.keys())) if debug else ''
     )
 
 
