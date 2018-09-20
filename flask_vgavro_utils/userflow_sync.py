@@ -1,12 +1,14 @@
 import logging
 from datetime import datetime
 from collections import defaultdict
+from functools import partial
 
 import sqlalchemy as sa
 from dateutil.parser import parse as dateutil_parse
 from flask import current_app
 
 from .exceptions import ImproperlyConfigured
+from .sqla import transaction
 
 
 logger = logging.getLogger('userflow.sync')
@@ -185,13 +187,17 @@ def map_synchronizers(synchronizers):
     return rv
 
 
-def synchronize(synchronizers, request, batch_size=100, **data):
+def synchronize(synchronizers, request, commit=True, batch_size=100, **data):
+    _sync_request = partial(sync_request, synchronizers, request)
+    if commit:
+        _sync_request = transaction(commit=True)(_sync_request)
+
     if data:
         for name in data.keys():
             if name not in synchronizers:
                 raise ValueError('Unknown model: %s' % name)
         # batch_size is ignored, maybe todo?
-        return sync_request(synchronizers, request, data)
+        return _sync_request(data)
 
     data, counter = defaultdict(list), 0
     unfinished = []
@@ -201,7 +207,7 @@ def synchronize(synchronizers, request, batch_size=100, **data):
             data[name].append(id)
             counter += 1
             if counter >= batch_size:
-                sync_request(synchronizers, request, data)
+                _sync_request(data)
                 data = defaultdict(list)
                 counter = 0
                 [s.finish() for s in unfinished]
@@ -213,7 +219,7 @@ def synchronize(synchronizers, request, batch_size=100, **data):
             unfinished.append(synchronizer)
 
     if counter:
-        sync_request(synchronizers, request, data)
+        _sync_request(data)
         [s.finish() for s in unfinished]
 
 
@@ -233,6 +239,7 @@ def _repr_payload(synchronizers, data):
     )
 
 
+@transaction(commit=True)
 def sync_response(synchronizers, data, session=None):
     if not session:
         session = current_app.extensions['sqlalchemy'].db.session
