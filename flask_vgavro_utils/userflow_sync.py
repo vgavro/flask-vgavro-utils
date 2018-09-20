@@ -220,7 +220,7 @@ def _repr_payload_data(name, data, debug):
 def _repr_payload(synchronizers, data):
     return '{} {}'.format(
         data['time'],
-        ', '.join(_repr_payload_data(name, data, current_app.debug)
+        ', '.join(_repr_payload_data(name, data_, current_app.debug)
                   for name, data_ in data.items()
                   if name in synchronizers)
     )
