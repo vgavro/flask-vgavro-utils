@@ -210,10 +210,17 @@ def synchronize(synchronizers, request, batch_size=100):
         [s.finish() for s in unfinished]
 
 
+def _repr_payload_data(name, data, debug):
+    return '{}={}{}'.format(
+        name, len(data_),
+        '({})'.format(tuple(data_.keys())) if debug else ''
+    )
+
+
 def _repr_payload(synchronizers, data):
     return '{} {}'.format(
         data['time'],
-        ', '.join('{}={}'.format(name, len(data_))
+        ', '.join(_repr_payload_data(name, data, current_app.debug)
                   for name, data_ in data.items()
                   if name in synchronizers)
     )
