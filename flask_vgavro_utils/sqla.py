@@ -89,7 +89,7 @@ class transaction(contextlib.ContextDecorator):
 
     def __call__(self, func):
         if not self.ctx_name:
-            self.ctx_name = func.__name__
+            self.ctx_name = getattr(func, '__name__', 'unknown')
         return super().__call__(func)
 
     def __enter__(self):
