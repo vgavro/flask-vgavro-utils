@@ -185,12 +185,19 @@ def map_synchronizers(synchronizers):
     return rv
 
 
-def synchronize(synchronizers, request, batch_size=100):
+def synchronize(synchronizers, request, batch_size=100, **data):
+    if data:
+        for name in data.keys():
+            if name not in synchronizers:
+                raise ValueError('Unknown model: %s' % name)
+        # batch_size is ignored, maybe todo?
+        return sync_request(synchronizers, request, data)
+
     data, counter = defaultdict(list), 0
     unfinished = []
 
     for name, synchronizer in synchronizers.items():
-        for id in _maybe_to_flat(synchronizer.get_ids_for_sync()):
+        for id in set(_maybe_to_flat(synchronizer.get_ids_for_sync())):
             data[name].append(id)
             counter += 1
             if counter >= batch_size:
