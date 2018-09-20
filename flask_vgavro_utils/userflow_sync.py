@@ -40,14 +40,14 @@ def _synchronizer_meth_decorator(type_):
         if func:
             return decorator()(func)
 
-        def decorator(func):
+        def decorator_(func):
             func._synchronizer = {
                 'type': type_,
                 'name': name or func.__name__
             }
             return func
 
-        return decorator
+        return decorator_
     return decorator
 
 
