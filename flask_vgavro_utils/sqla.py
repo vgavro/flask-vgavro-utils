@@ -129,3 +129,14 @@ class transaction(contextlib.ContextDecorator):
             # NOTE: looks like close explicitly do the rollback anyway
             # self.log('close ident=%s time=%.3f', get_ident(), delta)
             self.session.close()
+
+
+def iterate_qs_till_empty(qs, entity_callback=lambda x: x, batch_callback=lambda x: x,
+                          batch_size=100, **transaction_kwargs):
+    if transaction_kwargs:
+        batch_callback = transaction(**transaction_kwargs)(batch_callback)
+    while True:
+        batch = tuple(entity_callback(e) for e in qs.limit(batch_size))
+        if not batch:
+            break
+        batch_callback(batch)
