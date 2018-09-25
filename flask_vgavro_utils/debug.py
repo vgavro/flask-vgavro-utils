@@ -1,4 +1,10 @@
+import logging
+import contextlib
+from time import time
 from inspect import isclass, isroutine
+
+
+logger = logging.getLogger('flask-vgavro-utils.debug')
 
 # Some things based on traced https://github.com/mzipay/Autologging/blob/master/autologging.py
 
@@ -84,3 +90,26 @@ def trace(obj=None, pdb=False):
         else:
             return trace_func(pdb)(obj)
     return decorator
+
+
+class log_time(contextlib.ContextDecorator):
+    def __init__(self, ctx_name=None, logger=None, log_start=False):
+        self.ctx_name, self.log_start, self.logger = \
+            ctx_name, log_start, logger
+
+    def __call__(self, func):
+        if not self.ctx_name:
+            self.ctx_name = getattr(func, '__name__', 'unknown')
+        return super().__call__(func)
+
+    def __enter__(self):
+        self.log = self.logger or logger
+        print('wtf', self.log)
+        self.started = time()
+        if self.log_start:
+            self.log.debug('%s: started' % self.ctx_name)
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        time_ = time() - self.started
+        self.log.debug('%s: finished in %0.4f seconds with %s',
+                  self.ctx_name, time_, 'success' if exc_value is None else repr(exc_value))
