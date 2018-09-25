@@ -94,7 +94,7 @@ def trace(obj=None, pdb=False):
 
 class log_time(contextlib.ContextDecorator):
     def __init__(self, ctx_name=None, logger=None, log_start=False):
-        self.ctx_name, self.logger, self.log_start  = \
+        self.ctx_name, self.logger, self.log_start = \
             ctx_name, logger, log_start
 
     def __call__(self, func):
