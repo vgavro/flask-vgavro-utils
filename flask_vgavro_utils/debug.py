@@ -94,8 +94,8 @@ def trace(obj=None, pdb=False):
 
 class log_time(contextlib.ContextDecorator):
     def __init__(self, ctx_name=None, logger=None, log_start=False):
-        self.ctx_name, self.log_start, self.logger = \
-            ctx_name, log_start, logger
+        self.ctx_name, self.logger, self.log_start  = \
+            ctx_name, logger, log_start
 
     def __call__(self, func):
         if not self.ctx_name:
@@ -103,13 +103,12 @@ class log_time(contextlib.ContextDecorator):
         return super().__call__(func)
 
     def __enter__(self):
-        self.log = self.logger or logger
-        print('wtf', self.log)
+        self.log = (self.logger or logger).debug
         self.started = time()
         if self.log_start:
             self.log.debug('%s: started' % self.ctx_name)
 
     def __exit__(self, exc_type, exc_value, exc_tb):
         time_ = time() - self.started
-        self.log.debug('%s: finished in %0.4f seconds with %s',
-                  self.ctx_name, time_, 'success' if exc_value is None else repr(exc_value))
+        self.log('%s: finished in %0.4f seconds with %s', self.ctx_name,
+                 time_, 'success' if exc_value is None else repr(exc_value))
