@@ -106,7 +106,7 @@ class log_time(contextlib.ContextDecorator):
         self.log = (self.logger or logger).debug
         self.started = time()
         if self.log_start:
-            self.log.debug('%s: started' % self.ctx_name)
+            self.log('%s: started' % self.ctx_name)
 
     def __exit__(self, exc_type, exc_value, exc_tb):
         time_ = time() - self.started
