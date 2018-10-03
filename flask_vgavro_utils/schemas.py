@@ -33,7 +33,7 @@ class UnknownExcludeSchemaMixin:
         super().__init__(*args, **kwargs)
 
 
-class Schema(ma.Schema):
+class Schema(UnknownExcludeSchemaMixin, ma.Schema):
     def handle_error(self, exc, obj):
         exc.schema = self
         raise exc
