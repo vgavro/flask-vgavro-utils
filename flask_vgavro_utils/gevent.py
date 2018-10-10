@@ -5,6 +5,7 @@ from datetime import datetime
 import signal
 
 from flask import current_app
+from werkzeug.utils import cached_property
 import greenlet
 import gevent
 import gevent.monkey
@@ -16,6 +17,81 @@ from gevent.pywsgi import WSGIServer
 
 from .app import Flask
 from .utils import get_argv_opt, monkey_patch_meth
+
+
+class CachedBulkProcessor:
+    def __init__(self, pool, cache, cache_key, cache_timeout, cache_fail_timeout=None,
+                 update_timeout=10, join_timeout=30, join_timeout_raise=False,
+                 worker=None, logger=None):
+        self.pool = pool
+        self.cache = cache
+        assert '{}' in cache_key, 'Cache key should have format placeholder'
+        self.cache_key = cache_key
+        self.cache_timeout = cache_timeout
+        self.cache_fail_timeout = cache_fail_timeout or cache_timeout
+        self.update_timeout = update_timeout
+        self.join_timeout = join_timeout
+        self.join_timeout_raise = join_timeout_raise
+        if worker:
+            self._worker = worker
+        self._logger = logger
+
+        self.workers = {}
+
+    @cached_property
+    def logger(self):
+        self._logger or current_app.logger
+
+    def __call__(self, *entity_ids, update=False, join=False):
+        timeout = gevent.Timeout.start_new(self.update_timeout)
+        try:
+            rv, workers = self._get_or_update(entity_ids, update)
+        except gevent.Timeout:
+            self.logger.warn('Update timeout: %s', entity_ids)
+            raise
+        else:
+            timeout.cancel()  # TODO: api?
+
+        if workers and join:
+            try:
+                gevent.joinall(workers, timeout=self.join_timeout)
+            except gevent.Timeout:
+                self.logger.warn('Join timeout: %s', set(entity_ids) - set(rv))
+                # raise
+            rv_, _ = self._get_or_update(set(entity_ids) - set(rv), update=False)
+            rv.update(rv_)
+        return rv
+
+    def _get_or_update(self, entity_ids, update):
+        rv, workers = {}, []
+        for entity_id in entity_ids:
+            data = self.cache.get(self.cache_key.format(entity_id))
+            if data:
+                rv[entity_id] = data
+            elif data is False:
+                rv[entity_id] = None
+            elif update:
+                workers.append(self.get_or_create_worker(entity_id))
+        return rv, workers
+
+    def get_or_create_worker(self, entity_id):
+        if entity_id in self.workers:
+            return self.workers[entity_id]
+        self.workers[entity_id] = self.pool.spawn(self.worker, entity_id)
+        return self.workers[entity_id]
+
+    def worker(self, entity_id):
+        try:
+            rv = self._worker(entity_id)
+        except Exception as exc:
+            self.logger.exception('Worker failed: %s %r', entity_id, exc)
+        else:
+            timeout = self.cache_fail_timeout if rv is False else self.cache_timeout
+            self.cache.set(self.cache_key.format(entity_id), rv, timeout)
+        del self.workers[entity_id]
+
+    def _worker(self, entity_id):
+        raise NotImplementedError()
 
 
 class Semaphore(Semaphore):
