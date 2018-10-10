@@ -40,9 +40,10 @@ class CachedBulkProcessor:
 
     @cached_property
     def logger(self):
-        self._logger or current_app.logger
+        return self._logger or current_app.logger
 
-    def __call__(self, *entity_ids, update=False, join=False):
+    def __call__(self, *entity_ids, update=True, join=False):
+        entity_ids = set(entity_ids)
         timeout = gevent.Timeout.start_new(self.update_timeout)
         try:
             rv, workers = self._get_or_update(entity_ids, update)
