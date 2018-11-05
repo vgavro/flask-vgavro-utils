@@ -105,8 +105,8 @@ class NestedFromValue(NestedLazy):
     _post_load.__marshmallow_kwargs__ = _post_load.__marshmallow_hook__ = defaultdict(dict)
     _post_dump = _post_load
 
-    def _add_to_schema(self, field_name, parent):
-        super()._add_to_schema(field_name, parent)
+    def _bind_to_schema(self, field_name, parent):
+        super()._bind_to_schema(field_name, parent)
 
         # Binding tag processors to parent schema,
         # tricky shit because of marshmallow design...
