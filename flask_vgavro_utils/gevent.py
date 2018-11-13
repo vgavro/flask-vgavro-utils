@@ -1,6 +1,7 @@
 import sys
 import time
 from functools import wraps
+from collections import UserDict
 from datetime import datetime
 import signal
 
@@ -12,11 +13,43 @@ import gevent.monkey
 from gevent.hub import get_hub
 from gevent.pool import Pool
 from gevent.greenlet import Greenlet
-from gevent.lock import Semaphore
+from gevent.lock import Semaphore, BoundedSemaphore
 from gevent.pywsgi import WSGIServer
 
 from .app import Flask
 from .utils import get_argv_opt, monkey_patch_meth
+
+
+class LockedDict(UserDict):
+    def __init__(self, timeout=None):
+        self.timeout = timeout
+        super().__init__()
+
+    def __getitem__(self, key):
+        self.get(key)  # For semaphore wait
+        return self.data[key]  # For key error
+
+    def get(self, key):
+        if key in self.data:
+            if isinstance(self.data[key], BoundedSemaphore):
+                self.data[key].wait(self.timeout)
+                assert not isinstance(self.data[key], BoundedSemaphore)
+        return None
+
+    def __setitem__(self, key, value):
+        if not callable(value):
+            raise ValueError('Value %s should be callable %s' % value)
+        lock = self.data[key] = BoundedSemaphore()
+        lock.acquire()
+        self.data[key] = value()
+        assert not isinstance(self.data[key], BoundedSemaphore)
+        lock.release()
+
+    def factory(self, key):
+        raise NotImplementedError()
+
+    def set(self, key):
+        self[key] = lambda: self.factory(key)
 
 
 class CachedBulkProcessor:
@@ -96,6 +129,7 @@ class CachedBulkProcessor:
 
 
 class Semaphore(Semaphore):
+    # TODO: looks like it's already implemented in newer gevent versions
     """Extends gevent.lock.Semaphore with context."""
     def __enter__(self):
         self.acquire()
