@@ -20,36 +20,36 @@ from .app import Flask
 from .utils import get_argv_opt, monkey_patch_meth
 
 
-class LockedDict(UserDict):
-    def __init__(self, timeout=None):
+class LockedFactoryDict(UserDict):
+    def __init__(self, factory=None, timeout=None):
+        self._factory = factory
         self.timeout = timeout
         super().__init__()
 
     def __getitem__(self, key):
-        self.get(key)  # For semaphore wait
-        return self.data[key]  # For key error
+        if key not in self.data:
+            self[key] = lambda: self.factory(key)
+        return self.get(key)
 
     def get(self, key):
         if key in self.data:
             if isinstance(self.data[key], BoundedSemaphore):
                 self.data[key].wait(self.timeout)
                 assert not isinstance(self.data[key], BoundedSemaphore)
-        return None
 
-    def __setitem__(self, key, value):
-        if not callable(value):
-            raise ValueError('Value %s should be callable %s' % value)
+    def __setitem__(self, key, factory):
+        if not callable(factory):
+            raise ValueError('value %s should be callable' % factory)
         lock = self.data[key] = BoundedSemaphore()
         lock.acquire()
-        self.data[key] = value()
+        self.data[key] = factory()
         assert not isinstance(self.data[key], BoundedSemaphore)
         lock.release()
 
     def factory(self, key):
+        if self._factory is not None:
+            return self._factory(key)
         raise NotImplementedError()
-
-    def set(self, key):
-        self[key] = lambda: self.factory(key)
 
 
 class CachedBulkProcessor:
