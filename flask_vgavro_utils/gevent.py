@@ -36,6 +36,7 @@ class LockedFactoryDict(UserDict):
             if isinstance(self.data[key], BoundedSemaphore):
                 self.data[key].wait(self.timeout)
                 assert not isinstance(self.data[key], BoundedSemaphore)
+            return self.data[key]
 
     def __setitem__(self, key, factory):
         if not callable(factory):
