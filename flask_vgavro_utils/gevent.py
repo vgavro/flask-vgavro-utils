@@ -189,6 +189,8 @@ def app_greenlet_class(app):
 
 
 class GeventFlask(Flask):
+    _work_forever = []
+
     def configure(self, *args, **kwargs):
         super().configure(*args, **kwargs)
 
@@ -244,7 +246,7 @@ class GeventFlask(Flask):
                     self.logger.exception('work_forever failed: %r', exc)
                     print(exc, file=sys.stderr)
                     sys.exit(1)
-            self._work_forever = app_context(self)(wrapper)
+            self._work_forever.append(app_context(self)(wrapper))
         return decorator
 
     def stop(self, timeout=None):
@@ -286,8 +288,9 @@ def serve_forever(app, stop_signals=[signal.SIGTERM, signal.SIGINT], listen=None
         stop.stopping = True
 
         app.logger.info('Stopping server')
-        if hasattr(app, '_work_forever') and isinstance(app._work_forever, Greenlet):
-            app._work_forever.kill(timeout=5)
+        for worker in app._work_forever:
+            if isinstance(worker, Greenlet):
+                worker.kill(timeout=5)
         if hasattr(app, '_stop'):
             app._stop()
         for pool in app.pools.values():
@@ -300,6 +303,5 @@ def serve_forever(app, stop_signals=[signal.SIGTERM, signal.SIGINT], listen=None
     [gevent.signal(sig, stop) for sig in stop_signals]
 
     app.logger.info('Starting server on %s:%s', host, port)
-    if hasattr(app, '_work_forever'):
-        app._work_forever = gevent.spawn(app._work_forever)
+    app._work_forever = [gevent.spawn(w) for w in app._work_forever]
     server.serve_forever()
