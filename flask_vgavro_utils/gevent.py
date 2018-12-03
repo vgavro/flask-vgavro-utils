@@ -7,7 +7,7 @@ import signal
 
 from flask import current_app
 from werkzeug.utils import cached_property
-import greenlet
+from greenlet import settrace as greenlet_settrace
 import gevent
 import gevent.monkey
 from gevent.hub import get_hub
@@ -158,7 +158,7 @@ def _create_switch_time_tracer(max_blocking_time, logger):
 
 def set_switch_time_tracer(max_blocking_time, logger):
     # based on http://www.rfk.id.au/blog/entry/detect-gevent-blocking-with-greenlet-settrace/
-    greenlet.settrace(_create_switch_time_tracer(max_blocking_time, logger))
+    greenlet_settrace(_create_switch_time_tracer(max_blocking_time, logger))
 
 
 def set_hub_exception_logger(logger):
@@ -186,6 +186,21 @@ def app_greenlet_class(app):
     def wrapper(run, *args, **kwargs):
         return Greenlet(app_context(app)(run), *args, **kwargs)
     return wrapper
+
+
+def spawn(*args, **kwargs):
+    # TODO: move this to flask-gevent module and remove app.* methods
+    current_app.spawn(*args, **kwargs)
+
+
+def spawn_later(*args, **kwargs):
+    # TODO: move this to flask-gevent module and remove app.* methods
+    current_app.spawn_later(*args, **kwargs)
+
+
+def greenlet_class(*args, **kwargs):
+    # TODO: move this to flask-gevent module and remove app.* methods
+    current_app.greenlet_class(*args, **kwargs)
 
 
 class GeventFlask(Flask):
