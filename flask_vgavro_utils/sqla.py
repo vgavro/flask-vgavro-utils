@@ -1,6 +1,6 @@
 import logging
 import contextlib
-# from threading import get_ident
+from threading import get_ident
 from time import time
 
 from flask import current_app
@@ -82,10 +82,10 @@ def db_reinit(db=None, bind=None):
 
 class transaction(contextlib.ContextDecorator):
     def __init__(self, commit=False, rollback=False, session=None,
-                 ctx_name=None, logger=None):
+                 ctx_name=None, logger=None, debug=False):
         assert not (commit and rollback), 'Specify commit or rollback, not both'
-        self.session, self.commit, self.rollback, self.ctx_name, self.logger = \
-            session, commit, rollback, ctx_name, logger
+        self.session, self.commit, self.rollback, self.ctx_name, self.logger, self.debug = \
+            session, commit, rollback, ctx_name, logger, debug
 
     def __call__(self, func):
         if not self.ctx_name:
@@ -96,38 +96,42 @@ class transaction(contextlib.ContextDecorator):
         if not self.session:
             self.session = current_app.extensions['sqlalchemy'].db.session
 
-        # TODO: add option for transaction logging in app config
-        # logger_ = ((self.logger is not True and self.logger) or
-        #            (current_app and current_app.logger) or logger)
+        logger_ = ((self.logger is not True and self.logger) or
+                   (current_app and current_app.logger) or logger)
+        debug = self.debug or (current_app and
+                               current_app.config.get('SQLALCHEMY_TRANSACTION_DEBUG'))
+        warn_delta = current_app and current_app.config.get('SQLALCHEMY_TRANSACTION_WARN_DELTA')
 
-        # def log(msg, *args, **kwargs):
-        #     msg = '{}: transaction {} ({})'.format(self.ctx_name or '?', msg,
-        #                                            self.session.bind.pool.status())
-        #     logger_.debug(msg, *args, **kwargs)
-        # self.log = log
-        # self.log('started ident=%s', get_ident())
+        def log(msg, *args, delta=None):
+            warn = (delta and warn_delta and delta >= warn_delta)
+            if logger_ and (debug or warn):
+                logger_.log(logging.WARNING if warn else logging.DEBUG,
+                    '{}: transaction {} ({})'.format(self.ctx_name or '?', msg,
+                                                     self.session.bind.pool.status()), *args)
+        self.log = log
+        self.log('started ident=%s', get_ident())
 
         self.started = time()
         self.session.flush()  # TODO: wtf? looks like we need it in userflow?
 
     def __exit__(self, exc_type, exc_value, exc_tb):
-        # delta = time() - self.started
+        delta = time() - self.started
         if not exc_type and self.commit:
             try:
                 self.session.commit()
-                # self.log('commit ident=%s time=%.3f', get_ident(), delta)
+                self.log('commit ident=%s time=%.3f', get_ident(), delta, delta=delta)
             except BaseException as exc:
                 self.session.close()
-                # self.log('commit aborted ident=%s time=%.3f exc=%r',
-                #          get_ident(), delta, exc)
+                self.log('commit aborted ident=%s time=%.3f exc=%r',
+                         get_ident(), delta, exc, delta=delta)
                 raise
         elif exc_type or self.rollback:
             self.session.rollback()
-            # self.log('rollback ident=%s time=%.3f exc=%r',
-            #          get_ident(), delta, exc_value)
+            self.log('rollback ident=%s time=%.3f exc=%r',
+                     get_ident(), delta, exc_value, delta=delta)
         else:
             # NOTE: looks like close explicitly do the rollback anyway
-            # self.log('close ident=%s time=%.3f', get_ident(), delta)
+            self.log('close ident=%s time=%.3f', get_ident(), delta, delta=delta)
             self.session.close()
 
 
