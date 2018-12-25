@@ -78,6 +78,8 @@ class CachedBulkProcessor:
 
     def __call__(self, *entity_ids, update=True, join=False):
         entity_ids = set(entity_ids)
+        # TODO: actualy this timeout is only related to pool waiting,
+        # so maybe move it to self.pool.spawn?
         timeout = gevent.Timeout.start_new(self.update_timeout)
         try:
             rv, workers = self._get_or_update(entity_ids, update)
@@ -88,11 +90,10 @@ class CachedBulkProcessor:
             timeout.cancel()  # TODO: api?
 
         if workers and join:
-            try:
-                gevent.joinall(workers, timeout=self.join_timeout)
-            except gevent.Timeout:
-                self.logger.warn('Join timeout: %s', set(entity_ids) - set(rv))
-                # raise
+            finished_workers = gevent.joinall(workers, timeout=self.join_timeout)
+            if len(workers) != len(finished_workers):
+                self.logger.warn('Join timeout: %d, not finished workers: %s', self.join_timeout,
+                                 [w.args[0] for w in set(workers).difference(finished_workers)])
             rv_, _ = self._get_or_update(set(entity_ids) - set(rv), update=False)
             rv.update(rv_)
         return rv
