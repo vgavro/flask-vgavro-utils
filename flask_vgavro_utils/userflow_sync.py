@@ -188,7 +188,7 @@ def map_synchronizers(synchronizers):
     return rv
 
 
-def synchronize(synchronizers, request, commit=True, batch_size=100, **data):
+def synchronize(synchronizers, request, commit=True, batch_size=100, skip={}, **data):
     _sync_request = partial(sync_request, synchronizers, request)
     if commit:
         _sync_request = transaction(commit=True)(_sync_request)
@@ -197,14 +197,15 @@ def synchronize(synchronizers, request, commit=True, batch_size=100, **data):
         for name in data.keys():
             if name not in synchronizers:
                 raise ValueError('Unknown model: %s' % name)
-        # batch_size is ignored, maybe todo?
+        # TODO: batch_size and skip is ignored
         return _sync_request(data)
 
     data, counter = defaultdict(list), 0
     unfinished = []
 
     for name, synchronizer in synchronizers.items():
-        for id in set(_maybe_to_flat(synchronizer.get_ids_for_sync())):
+        for id in (set(_maybe_to_flat(synchronizer.get_ids_for_sync()))
+                   .difference(skip.get(name, []))):
             data[name].append(id)
             counter += 1
             if counter >= batch_size:
