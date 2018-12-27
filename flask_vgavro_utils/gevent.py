@@ -87,6 +87,8 @@ class CachedBulkProcessor:
             self.logger.warn('Update timeout: %s', entity_ids)
             raise
         else:
+            self.logger.debug('Processing: rv=%s spawned=%s pool=%s',
+                set(rv.keys()), [w.args[0] for w in workers], _pool_status(self.pool))
             timeout.cancel()  # TODO: api?
 
         if workers and join:
@@ -117,10 +119,14 @@ class CachedBulkProcessor:
         return self.workers[entity_id]
 
     def worker(self, entity_id):
+        self.logger.debug('Starting worker: %s', entity_id)
         try:
             rv = self._worker(entity_id)
         except Exception as exc:
             self.logger.exception('Worker failed: %s %r', entity_id, exc)
+        except BaseException as exc:
+            self.logger.debug('Worker failed: %s %r', entity_id, exc)
+            raise
         else:
             timeout = self.cache_fail_timeout if rv is False else self.cache_timeout
             self.cache.set(self.cache_key.format(entity_id), rv, timeout)
