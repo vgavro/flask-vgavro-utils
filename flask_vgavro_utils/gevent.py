@@ -88,7 +88,7 @@ class CachedBulkProcessor:
             raise
         else:
             self.logger.debug('Processing: rv=%s spawned=%s pool=%s',
-                set(rv.keys()), [w.args[0] for w in workers], _pool_status(self.pool))
+                set(rv.keys()) or '{}', [w.args[0] for w in workers], _pool_status(self.pool))
             timeout.cancel()  # TODO: api?
 
         if workers and join:
@@ -284,7 +284,7 @@ class GeventFlask(Flask):
 
 
 def _pool_status(pool):
-    return 'Pool {}/{}'.format(pool.free_count(), pool.size)
+    return '{}/{}'.format(pool.free_count(), pool.size)
 
 
 def get_app_status():
