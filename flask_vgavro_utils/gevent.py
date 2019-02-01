@@ -88,7 +88,7 @@ class CachedBulkProcessor:
             raise
         else:
             self.logger.debug('Processing: rv=%s spawned=%s pool=%s',
-                set(rv.keys()) or '{}', [w.args[0] for w in workers], _pool_status(self.pool))
+                set(rv.keys()) or '{}', [(w.args and w.args[0]) for w in workers], _pool_status(self.pool))
             timeout.cancel()  # TODO: api?
 
         if workers and join:
@@ -113,9 +113,8 @@ class CachedBulkProcessor:
         return rv, workers
 
     def get_or_create_worker(self, entity_id):
-        if entity_id in self.workers:
-            return self.workers[entity_id]
-        self.workers[entity_id] = self.pool.spawn(self.worker, entity_id)
+        if entity_id not in self.workers:
+            self.workers[entity_id] = self.pool.spawn(self.worker, entity_id)
         return self.workers[entity_id]
 
     def worker(self, entity_id):
@@ -130,7 +129,8 @@ class CachedBulkProcessor:
         else:
             timeout = self.cache_fail_timeout if rv is False else self.cache_timeout
             self.cache.set(self.cache_key.format(entity_id), rv, timeout)
-        del self.workers[entity_id]
+        finally:
+            del self.workers[entity_id]
 
     def _worker(self, entity_id):
         raise NotImplementedError()
