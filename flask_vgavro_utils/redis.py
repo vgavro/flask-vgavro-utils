@@ -6,7 +6,13 @@ import time
 
 from flask import current_app
 from redis.client import StrictRedis
-from redis.lock import LuaLock
+try:
+    from redis.lock import LuaLock
+except ImportError:
+    # In redis-py 3.0 LuaLock was renamed to Lock
+    # https://github.com/andymccurdy/redis-py/blob/master/CHANGES
+    # TODO: maybe rethink logic due 3.0 changes?
+    from redis.lock import Lock as LuaLock
 from redis.exceptions import LockError
 
 
