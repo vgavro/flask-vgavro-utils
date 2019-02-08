@@ -57,13 +57,15 @@ def dbreinit(verbose, no_confirm, bind=None):
 
 
 @click.command()
+@click.option('--bind', '-b', default=None)
 @with_appcontext
-def dbshell():
+def dbshell(bind):
     """Database shell (currently only PostgreSQL supported)."""
 
     db = current_app.extensions['sqlalchemy'].db
-    assert db.engine.name == 'postgresql'
-    cmd, url = 'psql', db.engine.url
+    engine = db.get_engine(bind=bind)
+    assert engine.name == 'postgresql'
+    cmd, url = 'psql', engine.url
     url_map = (('U', 'username'), ('h', 'host'), ('p', 'port'), ('d', 'database'))
     for psql_key, url_attr in url_map:
         if getattr(url, url_attr, None):
