@@ -88,7 +88,7 @@ class Flask(Flask):
         self._register_api_error_handlers()
 
     def configure(self, cors=False, sqlalchemy=False, marshmallow=False,
-                  redis=False, celery=False):
+                  redis=False, celery=False, gevent=False):
         self.config['TESTING'] = (os.environ.get('FLASK_TESTING', False) or
                                   sys.argv[0].endswith('pytest') or
                                   self.config.get('TESTING', False))
@@ -144,6 +144,10 @@ class Flask(Flask):
         if celery:
             from .celery import create_celery
             create_celery(self, task_views=True)
+
+        if gevent:
+            from flask_gevent import Gevent
+            Gevent(self)
 
     def response_wrapper(self, resp):
         """Wrapper before jsonify, to extend response dict with meta-data"""
