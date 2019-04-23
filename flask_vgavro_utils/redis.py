@@ -64,12 +64,16 @@ class Redis:
 
     def __init__(self, redis_url='redis://localhost:6379/0', base_key=None):
         self.base_key = base_key
+        self.redis_url = redis_url
         if redis_url not in self._redis_map:
             self._redis_map[redis_url] = StrictRedis.from_url(redis_url)
         self._redis = self._redis_map[redis_url]
 
     def _build_key(self, key):
         return self.base_key and '{}:{}'.format(self.base_key, key) or key
+
+    def from_base_key(self, base_key):
+        return self.__class__(self.redis_url, self._build_key(base_key))
 
     def get(self, key, default=None):
         result = self._redis.get(self._build_key(key))
