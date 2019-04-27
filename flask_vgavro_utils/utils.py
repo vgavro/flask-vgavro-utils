@@ -49,6 +49,17 @@ class EntityLoggerAdapter(logging.LoggerAdapter):
         return '[{}] {}'.format(self.entity, msg), kwargs
 
 
+class ContextLoggerAdapter(logging.LoggerAdapter):
+    def bind(self, **extra):
+        return self.__class__(self.logger, {**self.extra.copy(), **extra})
+
+    def process(self, msg, kwargs):
+        return (
+            ('%s %s'
+             % (' '.join('%s=%s' % (k, v) for k, v in self.extra.items()), msg)),
+            kwargs)
+
+
 def resolve_obj_key(obj, key):
     if key.isdigit():
         try:
