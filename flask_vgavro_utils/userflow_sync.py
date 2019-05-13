@@ -125,10 +125,10 @@ class Synchronizer:
         self.session.add(instance)
         return instance
 
-    def preprocess(self, instance):
+    def preprocess(self, instance, data=None):
         pass
 
-    def postprocess(self, instance):
+    def postprocess(self, instance, data=None):
         pass
 
     def set(self, instance, data, time):
@@ -262,10 +262,10 @@ def sync_response(synchronizers, data, session=None):
                     logger.warn('Skipped %s %s: no model to sync: %s',
                                 name, id, data_)
                     continue
-                synchronizer.preprocess(instance)
+                synchronizer.preprocess(instance, data=_data)
                 synchronizer.set(instance, data_, time)
                 rv[name][id] = synchronizer.get(instance)
-                synchronizer.postprocess(instance)
+                synchronizer.postprocess(instance, data=_data)
                 instance.sync_need = False
 
     logger.info('Sync response send %s', _repr_payload(synchronizers, rv))
