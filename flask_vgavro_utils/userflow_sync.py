@@ -262,10 +262,10 @@ def sync_response(synchronizers, data, session=None):
                     logger.warn('Skipped %s %s: no model to sync: %s',
                                 name, id, data_)
                     continue
-                synchronizer.preprocess(instance, data=_data)
+                synchronizer.preprocess(instance, data=data_)
                 synchronizer.set(instance, data_, time)
                 rv[name][id] = synchronizer.get(instance)
-                synchronizer.postprocess(instance, data=_data)
+                synchronizer.postprocess(instance, data=data_)
                 instance.sync_need = False
 
     logger.info('Sync response send %s', _repr_payload(synchronizers, rv))
