@@ -164,10 +164,10 @@ class Synchronizer:
         if callable(getter):
             return getter(instance)
         else:
-            if hasattr(instance, field):
-                return getattr(instance, field)
+            if hasattr(instance, getter):
+                return getattr(instance, getter)
             else:
-                return instance.data.get(field)
+                return instance.data.get(getter)
 
     def get_ids_for_sync(self):
         return (self.session.query(getattr(self.model, self.id_attr))
