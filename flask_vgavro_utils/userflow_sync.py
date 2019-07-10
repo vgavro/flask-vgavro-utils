@@ -167,7 +167,7 @@ class Synchronizer:
             if hasattr(instance, getter):
                 return getattr(instance, getter)
             else:
-                return instance.data.get(getter)
+                return getattr(instance, 'data', {}).get(getter)
 
     def get_ids_for_sync(self):
         return (self.session.query(getattr(self.model, self.id_attr))
@@ -245,7 +245,7 @@ def _repr_payload(synchronizers, data):
 def sync_response(synchronizers, data, session=None):
     if not session:
         session = current_app.extensions['sqlalchemy'].db.session
-    logger.info('Sync response %s', _repr_payload(synchronizers, data))
+    logger.debug('Sync response %s', _repr_payload(synchronizers, data))
 
     rv = {'time': datetime.utcnow()}
     time = dateutil_parse(data['time'])
@@ -268,7 +268,7 @@ def sync_response(synchronizers, data, session=None):
                 synchronizer.postprocess(instance, data=data_)
                 instance.sync_need = False
 
-    logger.info('Sync response send %s', _repr_payload(synchronizers, rv))
+    logger.debug('Sync response send %s', _repr_payload(synchronizers, rv))
     return rv
 
 
@@ -292,9 +292,9 @@ def sync_request(synchronizers, request, data, time=None):
             synchronizer.preprocess(instance)
             payload[name][id] = synchronizer.get(instance)
 
-    logger.info('Sync request %s', _repr_payload(synchronizers, payload))
+    logger.debug('Sync request %s', _repr_payload(synchronizers, payload))
     response = request(payload)
-    logger.info('Sync request receive %s', _repr_payload(synchronizers, response))
+    logger.debug('Sync request receive %s', _repr_payload(synchronizers, response))
 
     time = dateutil_parse(response['time'])
     for name, instance_map in data_map.items():
