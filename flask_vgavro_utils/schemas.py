@@ -23,14 +23,20 @@ else:
         pass
 
 
-class UnknownExcludeSchemaMixin:
-    """
-    As there is no schema.Meta inheritance, defaults to unknown='exclude' on initialization.
-    """
-    def __init__(self, *args, **kwargs):
-        if 'unknown' not in kwargs and not hasattr(self.Meta, 'unknown'):
-            kwargs['unknown'] = 'exclude'
-        super().__init__(*args, **kwargs)
+if hasattr(ma.schema.BaseSchema, 'unknown'):
+    # Introduced in 3.0.0b12 (2018-07-04)
+    # https://github.com/marshmallow-code/marshmallow/pull/838
+    class UnknownExcludeSchemaMixin:
+        """
+        As there is no schema.Meta inheritance, defaults to unknown='exclude' on initialization.
+        """
+        def __init__(self, *args, **kwargs):
+            if 'unknown' not in kwargs and not hasattr(self.Meta, 'unknown'):
+                kwargs['unknown'] = 'exclude'
+            super().__init__(*args, **kwargs)
+else:
+    class UnknownExcludeSchemaMixin:
+        pass
 
 
 class Schema(UnknownExcludeSchemaMixin, ma.Schema):
