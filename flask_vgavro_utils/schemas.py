@@ -40,7 +40,9 @@ else:
 
 
 class Schema(UnknownExcludeSchemaMixin, ma.Schema):
-    def handle_error(self, exc, obj):
+    def handle_error(self, exc, obj, **kwargs):
+        # TODO: maybe it's not actual already,
+        # because in marshmallow 3 wee set this anyway?
         exc.schema = self
         raise exc
 
