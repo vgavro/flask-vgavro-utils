@@ -1,8 +1,7 @@
-#TODO: rename this module to ma
+# TODO: rename this module to ma
 
 import marshmallow as ma
 from .fields import *  # noqa (compatibility)
-
 
 # https://github.com/marshmallow-code/marshmallow/pull/711/files
 ma_version_lt_300b7 = hasattr(ma.schema, 'MarshalResult')
@@ -23,9 +22,14 @@ else:
         pass
 
 
-if hasattr(ma.schema.BaseSchema, 'unknown'):
+if (
+    hasattr(ma.schema.BaseSchema, 'unknown')
     # Introduced in 3.0.0b12 (2018-07-04)
     # https://github.com/marshmallow-code/marshmallow/pull/838
+    or 'unknown' in getattr(ma.schema.BaseSchema, '_default_error_messages', {})
+    # in marshmallow 3.2 unknown attribute not in Schema class, but is set after __init__,
+    # maybe introduced in earlier versions..
+):
     class UnknownExcludeSchemaMixin:
         """
         As there is no schema.Meta inheritance, defaults to unknown='exclude' on initialization.
