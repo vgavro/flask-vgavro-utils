@@ -103,8 +103,11 @@ class Flask(Flask):
 
         if self.config.get('LOGGING'):
             # Turn off werkzeug default handlers not to duplicate logs
+            self.logger.info('Configuring logging')
+            print(logging.getLogger('werkzeug').handlers)
             logging.getLogger('werkzeug').handlers = []
             logging.config.dictConfig(self.config['LOGGING'])
+            self.logger.info('Logger configured')
 
         if self.config.get('FLASK_SHELL_CONTEXT'):
             register_shell_context(self, *self.config['FLASK_SHELL_CONTEXT'])

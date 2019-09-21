@@ -42,7 +42,7 @@ class EntityError(ApiError):
         data = {
             'errors': errors,
             'data': exc.data,
-            'valid_data': exc.valid_data,
+            'valid_data': getattr(exc, 'valid_data', None),  # not in marshmallow 2.x
         }
         if hasattr(exc, 'schema'):
             data['schema'] = exc.schema.__class__.__name__
